@@ -8,7 +8,7 @@ parser.add_argument('--android',action='store_true')
 parser.add_argument('--runtime-archive',type=Path)
 args=parser.parse_args()
 source=root/'tracker'
-files=['index.html','app.js','style.css','server.mjs','collector.mjs','check-in.mjs','auto-check-in.mjs','events.mjs','official-art.mjs','event-images.mjs','secrets.mjs','hoyolab-settings.mjs','resource-time.mjs','logo.png','package.json','config.example.json']
+files=['index.html','app.js','style.css','server.mjs','history.mjs','history-dates.mjs','collector.mjs','check-in.mjs','auto-check-in.mjs','events.mjs','official-art.mjs','event-images.mjs','secrets.mjs','hoyolab-settings.mjs','resource-time.mjs','logo.png','package.json','config.example.json']
 files += [p.relative_to(source).as_posix() for p in (source/'assets').rglob('*') if p.is_file() and not p.is_symlink()]
 for destination in [root/'desktop/tracker',root/'android/app/src/main/assets/tracker']:
  destination.mkdir(parents=True,exist_ok=True)

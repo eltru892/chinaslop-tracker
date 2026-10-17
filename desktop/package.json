@@ -1,7 +1,7 @@
 {
   "name": "chinaslop-tracker",
   "productName": "Chinaslop Tracker",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Local progress and event tracker for Genshin, Star Rail, ZZZ and Endfield",
   "author": "Chinaslop Tracker",
   "private": true,
@@ -41,7 +41,7 @@
     },
     "portable": {
       "artifactName": "Chinaslop-Tracker-Windows-${version}.exe",
-      "unpackDirName": "chinaslop-tracker-1.0.0"
+      "unpackDirName": "chinaslop-tracker-1.0.1"
     }
   }
 }

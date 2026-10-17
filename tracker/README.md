@@ -70,3 +70,5 @@ History is a separate page with independent daily and weekly pagination. Desktop
 ## Verification
 
 Run `npm test` or `node --test` from the extracted project folder to run the included tests. No package installation is required.
+
+History retains observations from the last 365 days regardless of refresh interval. Expired records are removed from disk on startup and sync. Damaged history lines are skipped while valid records are recovered. Failed game refreshes retain the last successful progress, labeled with its original observation time and the refresh error.

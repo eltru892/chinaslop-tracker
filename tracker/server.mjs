@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { readHistory, writeHistory, retainHistory, mergeSnapshot } from './history.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -99,18 +100,16 @@ async function unlock(passphrase) {
   if (unlockedSecrets.hoyolabCookie || unlockedSecrets.skportToken) sync();
 }
 async function history() {
-  try {
-    const text = await fs.readFile(dataPath, 'utf8');
-    return text.trim().split('\n').filter(Boolean).slice(-3000).map(line => JSON.parse(line));
-  } catch (error) { if (error.code === 'ENOENT') return []; throw error; }
+  return readHistory(dataPath);
 }
 async function sync() {
   if (syncing || !unlockedSecrets) return;
   syncing = true;
   try {
-    latest = await collect({ ...(await readConfig()), ...unlockedSecrets });
-    await fs.mkdir(path.dirname(dataPath), { recursive:true });
-    await fs.appendFile(dataPath, JSON.stringify(latest) + '\n', { mode:0o600 });
+    const incoming = await collect({ ...(await readConfig()), ...unlockedSecrets });
+    const snapshot = mergeSnapshot(latest, incoming);
+    await writeHistory(dataPath, retainHistory([...(await history()), snapshot]));
+    latest = snapshot;
     lastError = null;
   } catch (error) { lastError = error.message; }
   finally { syncing = false; }
@@ -230,7 +229,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok:true });
     }
     if (req.method !== 'GET') return send(res, 405, { error:'Method not allowed' });
-    const files = { '/':'index.html', '/index.html':'index.html', '/app.js':'app.js', '/resource-time.mjs':'resource-time.mjs', '/style.css':'style.css', '/logo.png':'logo.png', '/assets/genshin-logo.png':'assets/genshin-logo.png', '/assets/hsr-logo.png':'assets/hsr-logo.png', '/assets/zzz-logo.png':'assets/zzz-logo.png', '/assets/endfield-logo.png':'assets/endfield-logo.png' };
+    const files = { '/':'index.html', '/index.html':'index.html', '/app.js':'app.js', '/resource-time.mjs':'resource-time.mjs', '/history-dates.mjs':'history-dates.mjs', '/style.css':'style.css', '/logo.png':'logo.png', '/assets/genshin-logo.png':'assets/genshin-logo.png', '/assets/hsr-logo.png':'assets/hsr-logo.png', '/assets/zzz-logo.png':'assets/zzz-logo.png', '/assets/endfield-logo.png':'assets/endfield-logo.png' };
     const name = files[url.pathname] || (/^\/assets\/endfield-backgrounds\/\d+(?:-thumb)?\.webp$/.test(url.pathname) ? url.pathname.slice(1) : null);
     if (!name) return send(res, 404, { error:'Not found' });
     const type = name.endsWith('.webp') ? 'image/webp' : name.endsWith('.png') ? 'image/png' : name.endsWith('.svg') ? 'image/svg+xml' : /\.m?js$/.test(name) ? 'text/javascript; charset=utf-8' : name.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/html; charset=utf-8';
@@ -239,6 +238,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 const saved = await history();
+await writeHistory(dataPath, saved);
 latest = saved.at(-1) || null;
 encryptedEnvelope = await readEncryptedFile();
 await schedule();

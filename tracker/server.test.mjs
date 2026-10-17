@@ -10,7 +10,7 @@ import { encryptSecrets, decryptSecrets } from './secrets.mjs';
 test('saved ID stays encrypted and is never returned by the settings API', async t => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(),'tracker-settings-'));
   const password = 'example-test-password';
-  for (const file of ['server.mjs','auto-check-in.mjs','check-in.mjs','secrets.mjs','hoyolab-settings.mjs','resource-time.mjs','events.mjs','official-art.mjs','event-images.mjs']) {
+  for (const file of ['server.mjs','history.mjs','history-dates.mjs','auto-check-in.mjs','check-in.mjs','secrets.mjs','hoyolab-settings.mjs','resource-time.mjs','events.mjs','official-art.mjs','event-images.mjs']) {
     await fs.copyFile(new URL(file, import.meta.url),path.join(root,file));
   }
   // No real network requests or account credentials are used in this test.
@@ -115,7 +115,7 @@ test('saved ID stays encrypted and is never returned by the settings API', async
 test('packaged runtime separates private storage and requires its app session',async t=>{
   const root=await fs.mkdtemp(path.join(os.tmpdir(),'tracker-app-'));
   const storage=path.join(root,'private');
-  for(const file of ['server.mjs','auto-check-in.mjs','check-in.mjs','secrets.mjs','hoyolab-settings.mjs','resource-time.mjs','events.mjs','official-art.mjs','event-images.mjs'])await fs.copyFile(new URL(file,import.meta.url),path.join(root,file));
+  for(const file of ['server.mjs','history.mjs','history-dates.mjs','auto-check-in.mjs','check-in.mjs','secrets.mjs','hoyolab-settings.mjs','resource-time.mjs','events.mjs','official-art.mjs','event-images.mjs'])await fs.copyFile(new URL(file,import.meta.url),path.join(root,file));
   await fs.writeFile(path.join(root,'index.html'),'<title>Test tracker</title>');
   await fs.writeFile(path.join(root,'collector.mjs'),'export function hoyoHeaders(){return {}};export function skportHeaders(){return {}};export async function getSkportContext(){throw new Error("Disabled")};export async function collect(){return {games:{}}}');
   const child=spawn(process.execPath,[path.join(root,'server.mjs')],{env:{...process.env,PORT:'0',TRACKER_DATA_DIR:storage,TRACKER_ACCESS_KEY:'fake-test-session'},stdio:['ignore','pipe','pipe','ipc']});

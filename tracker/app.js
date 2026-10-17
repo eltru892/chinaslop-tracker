@@ -1,3 +1,4 @@
+import { weekStart, weekKey } from './history-dates.mjs';
 import { resourceCountdown, dailyResetInfo, dailyResetCountdown, weeklyResetInfo, weeklyResetCountdown, eventCountdown } from './resource-time.mjs';
 
 const names = { genshin:'Genshin Impact', hsr:'Honkai: Star Rail', zzz:'Zenless Zone Zero', endfield:'Arknights: Endfield' };
@@ -193,7 +194,6 @@ async function loadEvents() {
 }
 
 function localDay(iso) { return new Date(iso).toLocaleDateString(undefined,{ year:'numeric',month:'short',day:'numeric' }); }
-function weekStart(date) { const d = new Date(date); d.setHours(0,0,0,0); d.setDate(d.getDate() - ((d.getDay()+6)%7)); return d; }
 function count(value) { return value && typeof value.current === 'number' && typeof value.total === 'number' ? `${value.current}/${value.total}` : 'Not exposed'; }
 function percentage(value) { return value && value.total > 0 ? Math.max(0,Math.min(100,Math.round(value.current/value.total*100))) : 0; }
 function metricLabel(game, label) {
@@ -272,6 +272,7 @@ function metricCard(game, data, kind) {
     (weekly ? weeklyResetTimers : dailyResetTimers).push({node:timer,game,region:data.identity.region});
   }
   if (!data || data.error) { card.append(el('div','error',data?.error || 'No data yet')); return card; }
+  if (data.stale) card.append(el('div','error',`Refresh failed: ${data.syncError}. Showing saved progress from ${new Date(data.observedAt).toLocaleString()}.`));
   const metrics = el('div','metrics');
   for (const item of items) {
     const block = el('div','metric');
@@ -358,7 +359,9 @@ function historyEntry(snapshot, kind, date) {
     const cell = el('div',`historyCell game-${game}`);
     cell.append(el('h4','historyGameName',names[game]));
     for (const item of items) {
-      cell.append(el('span','historyMetricLabel',metricLabel(game,item.label)));
+      const label = el('span','historyMetricLabel',metricLabel(game,item.label));
+      if (item === items[0] && snapshot.games?.[game]?.stale) label.append(el('span','error',` · Saved progress from ${new Date(snapshot.games[game].observedAt).toLocaleString()}; refresh failed.`));
+      cell.append(label);
       const reward = 'rewardClaimed' in item ? item.rewardClaimed === true ? ' · ✓ Claimed' : item.rewardClaimed === null ? ' · Reward unknown' : ' · Unclaimed' : '';
       cell.append(el('strong','historyMetricValue',`${error ? 'Error' : progressText(item)}${reward}`));
     }
@@ -399,7 +402,7 @@ function renderHistory(list) {
   const latestByWeek = new Map();
   for (const row of list) {
     latestByDay.set(localDay(row.at),row);
-    latestByWeek.set(weekStart(new Date(row.at)).toISOString().slice(0,10),row);
+    latestByWeek.set(weekKey(new Date(row.at)),row);
   }
   const days = [...latestByDay.values()].reverse().map(snapshot => ({snapshot,date:localDay(snapshot.at)}));
   const formatDate = value => value.toLocaleDateString(undefined,{month:'short',day:'numeric'});
