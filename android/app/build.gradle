@@ -1,0 +1,16 @@
+plugins { id 'com.android.application' }
+android {
+  namespace 'local.chinaslop.tracker'
+  compileSdk 35
+  buildToolsVersion '35.0.0'
+  defaultConfig {
+    applicationId 'local.chinaslop.tracker'
+    minSdk 26
+    targetSdk 35
+    versionCode 1
+    versionName '1.0.0'
+    ndk { abiFilters 'arm64-v8a' }
+  }
+  buildTypes { release { minifyEnabled false } }
+  packaging { jniLibs { useLegacyPackaging true; keepDebugSymbols += ['**/*.so'] } }
+}

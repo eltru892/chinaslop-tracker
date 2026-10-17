@@ -1,0 +1,47 @@
+{
+  "name": "chinaslop-tracker",
+  "productName": "Chinaslop Tracker",
+  "version": "1.0.0",
+  "description": "Local progress and event tracker for Genshin, Star Rail, ZZZ and Endfield",
+  "author": "Chinaslop Tracker",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "dist:win": "electron-builder --win portable --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "44.9.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "local.chinaslop.tracker",
+    "asar": true,
+    "files": [
+      "main.cjs",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "tracker",
+        "to": "tracker",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "signAndEditExecutable": false,
+      "icon": "build/app.ico"
+    },
+    "portable": {
+      "artifactName": "Chinaslop-Tracker-Windows-${version}.exe",
+      "unpackDirName": "chinaslop-tracker-1.0.0"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.22.1)
+project(tracker C)
+add_library(node SHARED IMPORTED)
+set_target_properties(node PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/libnode.so)
+add_library(tracker SHARED tracker.c)
+target_link_libraries(tracker node log)
+target_link_options(tracker PRIVATE "-Wl,-z,max-page-size=16384")

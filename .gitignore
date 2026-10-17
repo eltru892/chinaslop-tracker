@@ -1,0 +1,30 @@
+# Personal account data and local settings
+**/config.local.json
+**/secrets.enc.json
+**/data/
+.env
+.env.*
+**/*.jks
+**/*.keystore
+**/*password*.txt
+
+# Generated applications, runtime downloads, and build tools
+.cache/
+**/node_modules/
+desktop/tracker/
+desktop/dist/
+android/app/src/main/assets/tracker/
+android/app/src/main/jniLibs/
+android/.gradle/
+android/.native-build/
+android/.cxx/
+android/app/.cxx/
+android/app/build/
+android/build/
+android/local.properties
+*.apk
+*.exe
+*.7z
+*.zip
+*.idsig
+.DS_Store
