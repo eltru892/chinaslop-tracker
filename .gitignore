@@ -28,3 +28,10 @@ android/local.properties
 *.zip
 *.idsig
 .DS_Store
+
+# Tauri generated resources and compiler output
+native/src-tauri/target/
+native/src-tauri/gen/
+native/src-tauri/resources/
+__pycache__/
+artifacts/

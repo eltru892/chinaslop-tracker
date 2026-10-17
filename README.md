@@ -51,39 +51,20 @@ node --test tracker/*.test.mjs
 
 The tests use fake credentials and mocked service responses. GitHub Actions runs them on pushes and pull requests.
 
-## Build Windows
+## Build Windows and Android
 
-Install Node.js 22 or newer and Python 3, then run from the repository root:
+New builds use **Tauri 2**. See [the native build guide](native/README.md) for Windows installers and standalone Android APKs. The shared Node backend and web UI remain in `tracker/`.
 
-```sh
-python scripts/prepare.py
-cd desktop
-npm ci
-npm run dist:win
-```
-
-The EXE is created in `desktop/dist`. Building on Windows is recommended. No account data is copied into the package.
-
-## Build Android
-
-Install Python 3, JDK 17, Gradle 8.10.2, Android SDK Platform 35, Build Tools 35.0.0, NDK 27.2.12479018, and CMake 3.22.1. Accept the Android SDK license yourself. Set `ANDROID_HOME` and `ANDROID_NDK_HOME` to their installed locations, and make `cmake` available on PATH.
-
-```sh
-python scripts/prepare.py --android
-cd android
-sh rebuild-native.sh
-gradle :app:assembleRelease
-```
-
-The Android Node runtime is downloaded from a pinned release and checked against its SHA-256 checksum. Native runtime binaries and generated app assets are not stored in Git. Sign the unsigned APK under `android/app/build/outputs/apk/release` with your own Android signing key. Keep that key private and backed up; future updates must use the same key.
+The published v1.0.0 downloads above are the previous Electron/Android builds. Rebuilding source does not replace those release assets automatically. Android updates require the original signing key.
 
 ## Project layout
 
 | Folder | Purpose |
 | --- | --- |
 | `tracker` | Shared web UI, server, connectors, assets and tests |
-| `desktop` | Windows Electron app wrapper |
-| `android` | Standalone Android WebView and embedded Node app |
+| `native` | Tauri Windows and Android applications |
+| `desktop` | Legacy Electron wrapper and original icon assets |
+| `android` | Embedded Node/JNI bridge, runtime notices and legacy wrapper |
 | `scripts` | Clean asset preparation and runtime download |
 
 ## Privacy and sources
