@@ -1,141 +1,559 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0c101b"><title>Chinaslop Tracker</title><link rel="stylesheet" href="/style.css"></head>
-<body>
-  <canvas id="backgroundCanvas" class="backgroundCanvas" aria-hidden="true" hidden></canvas>
-  <a class="skip-link" href="#daily">Skip to progress</a>
-  <header class="topbar">
-    <div class="brand">
-      <img class="brandLogo" src="/logo.png" alt="" width="132" height="108">
-      <div><h1>Chinaslop Tracker</h1></div>
-    </div>
-    <div class="headerTools">
-      <div class="topactions">
-        <button id="sync"><svg class="refreshIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.5-1L20 9M4 15l2.4 3A7 7 0 0 0 18 17"/></svg><span id="syncLabel">Refresh now</span></button>
-        <button id="checkIn" class="secondary" disabled><span aria-hidden="true">✓</span><span id="checkInLabel">Check in</span></button>
-        <button id="settingsToggle" class="secondary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/><path d="m9 3-.7 3-2.6 1L3 6.2l-2 3.5L3.2 12 1 14.3l2 3.5 2.7-.8 2.6 1L9 21h6l.7-3 2.6-1 2.7.8 2-3.5-2.2-2.3L23 9.7l-2-3.5-2.7.8-2.6-1L15 3Z" transform="translate(1 1) scale(.91)"/></svg>Settings</button>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#0c101b" />
+    <title>Chinaslop Tracker</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <canvas id="backgroundCanvas" class="backgroundCanvas" aria-hidden="true" hidden></canvas>
+    <a class="skip-link" href="#daily">Skip to progress</a>
+    <header class="topbar">
+      <div class="brand">
+        <img class="brandLogo" src="/logo.png" alt="" width="132" height="108" />
+        <div><h1>Chinaslop Tracker</h1></div>
       </div>
-      <div class="syncstatus"><span id="synced">No sync yet</span><span id="nextRefresh" role="timer" aria-live="off">Checking auto refresh…</span></div>
-    </div>
-  </header>
-  <nav class="dashboardnav" aria-label="Dashboard sections">
-    <div class="navlinks"><a id="navDaily" href="/#daily"><span class="navGlyph" aria-hidden="true">◈</span> Daily</a><a id="navWeekly" href="/#weekly"><span class="navGlyph" aria-hidden="true">▦</span> Weekly</a><a id="navEvents" href="/?page=events"><span class="navGlyph" aria-hidden="true">◷</span> Events</a><a id="navHistory" href="/?page=history"><span class="navGlyph" aria-hidden="true">↗</span> History</a></div>
-    <span id="connectionSummary" class="connectionSummary">Your progress, on this computer</span>
-  </nav>
-  <main>
-    <div id="notice" class="notice" hidden></div>
-    <section id="security" class="settings" hidden>
-      <h2 id="securityTitle">Protect saved accounts</h2>
-      <p id="securityText"></p>
-      <form id="securityForm" class="securityform">
-        <label>Encryption password<input id="passphrase" type="password" autocomplete="new-password" required></label>
-        <label id="confirmLabel">Confirm password<input id="confirmPassphrase" type="password" autocomplete="new-password"></label>
-        <div class="formactions"><button type="submit" id="unlockButton">Encrypt and unlock</button></div>
-      </form>
-      <p class="small">This password is not saved. You will enter it each time the tracker starts. Keep it somewhere safe; an encrypted file cannot be recovered without it.</p>
-    </section>
-    <section id="setup" class="setup" hidden><h2>Connect your accounts</h2><p>Add your HoYoLAB session cookie and SKPORT token in Settings to fetch progress. Tokens stay in this folder on your computer.</p><button id="setupSettings">Open Settings</button></section>
-    <section id="settings" class="settings" hidden>
-      <div class="sectiontitle"><h2>Settings</h2><button id="closeSettings" class="ghost">Close</button></div>
-      <nav class="settingsNav" aria-label="Settings sections">
-        <button type="button" data-settings-panel="accounts" aria-controls="settingsAccounts" aria-pressed="true">Accounts</button>
-        <button type="button" data-settings-panel="appearance" aria-controls="settingsAppearance" aria-pressed="false">Appearance</button>
-        <button type="button" data-settings-panel="security" aria-controls="settingsSecurity" aria-pressed="false">Security</button>
-      </nav>
-      <div id="settingsAccounts" class="settingsPanel">
-        <p class="settingsIntro">Saved values stay hidden. Leave a field blank to keep its saved value.</p>
-        <form id="settingsForm" class="accountSettingsForm">
-          <fieldset class="accountGroup"><legend>HoYoLAB</legend>
-            <p>Genshin Impact, Honkai: Star Rail &amp; Zenless Zone Zero</p>
-            <div class="accountFields"><label>HoYoLAB token value <span id="hoyoStatus"></span><input id="hoyoCookie" type="text" autocomplete="off" spellcheck="false" placeholder="Paste the ltoken_v2 value only"></label><label>HoYoLAB account ID value <span id="hoyoUidStatus"></span><input id="hoyoUid" type="text" inputmode="numeric" autocomplete="off" placeholder="Paste the ltuid_v2 value only"></label></div>
-            <div class="guides"><details><summary>How to get your HoYoLAB cookie</summary>
-          <p>Copy two cookie values from your signed-in HoYoLAB browser session.</p>
-          <ol>
-            <li>Open <a href="https://www.hoyolab.com/accountCenter" target="_blank" rel="noopener noreferrer">HoYoLAB Account Center</a> in Chrome or Edge and sign in.</li>
-            <li>Open Developer Tools with <kbd>⌥</kbd> + <kbd>⌘</kbd> + <kbd>I</kbd> on Mac, or <kbd>F12</kbd> on Windows.</li>
-            <li>Open <strong>Application → Storage → Cookies → https://www.hoyolab.com</strong>.</li>
-            <li>Find <code>ltoken_v2</code>. Copy only its <strong>Value</strong> and paste it into <strong>HoYoLAB token value</strong> below.</li>
-            <li>Find <code>ltuid_v2</code>. Copy only its <strong>Value</strong> and paste it into <strong>HoYoLAB account ID value</strong>.</li>
-            <li>Select <strong>Save and sync</strong>. The tracker adds the cookie names and formatting for you.</li>
-          </ol>
-          <p>The account ID comes from the <code>ltuid_v2</code> cookie; it is different from your in-game UID.</p>
-        </details></div>
-            <button type="button" id="removeHoyo" class="ghost removeAccount">Remove HoYoLAB</button>
-          </fieldset>
-          <fieldset class="accountGroup"><legend>SKPORT</legend>
-            <p>Arknights: Endfield</p>
-            <div class="accountFields"><label>SKPORT account token <span id="skportStatus"></span><input id="skportToken" type="text" autocomplete="off" spellcheck="false" placeholder="Your SKPORT account token"></label></div>
-            <div class="guides"><details><summary>How to get your SKPORT account token</summary>
-          <p>Copy the account token from your signed-in SKPORT session.</p>
-          <ol>
-            <li>Open <a href="https://game.skport.com/endfield/sign-in" target="_blank" rel="noopener noreferrer">SKPORT’s Endfield portal</a> and sign in with the Gryphline account linked to Endfield.</li>
-            <li>In the same browser and profile, open <a href="https://web-api.skport.com/cookie_store/account_token" target="_blank" rel="noopener noreferrer">SKPORT’s account-token page</a>.</li>
-            <li>Copy the full JSON response, or just its <code>data.content</code> value.</li>
-            <li>Paste it into the <strong>SKPORT account token</strong> field, then select <strong>Save and sync</strong>.</li>
-          </ol>
-          <p>If the page shows an error or an empty result, sign in again at the Endfield portal using the same browser profile, then reload the token page.</p>
-        </details></div>
-            <button type="button" id="removeSkport" class="ghost removeAccount">Remove SKPORT</button>
-          </fieldset>
-          <fieldset class="refreshGroup"><legend>Automatic refresh</legend><div class="refreshFields"><label>Refresh interval<select id="pollMinutes"><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="30" selected>30 minutes</option><option value="60">60 minutes</option><option value="120">2 hours</option><option value="240">4 hours</option><option value="480">8 hours</option><option value="custom">Custom</option></select></label><label id="customInterval" hidden>Custom interval (minutes)<input id="customPollMinutes" type="number" min="1" max="1440" step="1" value="15" disabled><span>1–1,440 minutes (up to 24 hours)</span></label></div></fieldset>
-          <fieldset class="refreshGroup"><legend>Daily check-in</legend>
-            <label class="autoCheckInToggle"><input id="autoCheckIn" type="checkbox"> Automatically check in every day</label>
-            <p class="small">Runs for all connected games while the tracker is running and unlocked. Checks on unlock and once an hour; completed check-ins are skipped.</p>
-            <p id="autoCheckInStatus" class="small" role="status"></p>
-          </fieldset>
-          <div class="formactions"><button type="submit">Save and sync</button></div>
+      <div class="headerTools">
+        <div class="topactions">
+          <button id="sync">
+            <svg
+              class="refreshIcon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              aria-hidden="true"
+            >
+              <path
+                d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.5-1L20 9M4 15l2.4 3A7 7 0 0 0 18 17"
+              /></svg
+            ><span id="syncLabel">Refresh now</span>
+          </button>
+          <button id="checkIn" class="secondary" disabled>
+            <span aria-hidden="true">✓</span><span id="checkInLabel">Check in</span>
+          </button>
+          <button id="settingsToggle" class="secondary">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              aria-hidden="true"
+            >
+              <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" />
+              <path
+                d="m9 3-.7 3-2.6 1L3 6.2l-2 3.5L3.2 12 1 14.3l2 3.5 2.7-.8 2.6 1L9 21h6l.7-3 2.6-1 2.7.8 2-3.5-2.2-2.3L23 9.7l-2-3.5-2.7.8-2.6-1L15 3Z"
+                transform="translate(1 1) scale(.91)"
+              /></svg
+            >Settings
+          </button>
+        </div>
+        <div class="syncstatus">
+          <span id="synced">No sync yet</span
+          ><span id="nextRefresh" role="timer" aria-live="off">Checking auto refresh…</span>
+        </div>
+      </div>
+    </header>
+    <nav class="dashboardnav" aria-label="Dashboard sections">
+      <div class="navlinks">
+        <a id="navDaily" href="/#daily"><span class="navGlyph" aria-hidden="true">◈</span> Daily</a
+        ><a id="navWeekly" href="/#weekly"
+          ><span class="navGlyph" aria-hidden="true">▦</span> Weekly</a
+        ><a id="navEvents" href="/?page=events"
+          ><span class="navGlyph" aria-hidden="true">◷</span> Events</a
+        ><a id="navHistory" href="/?page=history"
+          ><span class="navGlyph" aria-hidden="true">↗</span> History</a
+        >
+      </div>
+      <span id="connectionSummary" class="connectionSummary">Your progress, on this computer</span>
+    </nav>
+    <main>
+      <div id="notice" class="notice" hidden></div>
+      <section id="security" class="settings" hidden>
+        <h2 id="securityTitle">Protect saved accounts</h2>
+        <p id="securityText"></p>
+        <form id="securityForm" class="securityform">
+          <label
+            >Encryption password<input
+              id="passphrase"
+              type="password"
+              autocomplete="new-password"
+              required
+          /></label>
+          <label id="confirmLabel"
+            >Confirm password<input
+              id="confirmPassphrase"
+              type="password"
+              autocomplete="new-password"
+          /></label>
+          <div class="formactions">
+            <button type="submit" id="unlockButton">Encrypt and unlock</button>
+          </div>
         </form>
-        <p class="small">Account values are encrypted on this computer. Keep them private. Check-in rewards are claimed when you use Check in or enable automatic check-in.</p>
-      </div>
-      <div id="settingsAppearance" class="settingsPanel backgroundSettings" hidden>
-        <h3>Appearance</h3>
-        <p>Selecting an image automatically matches the palette to its colors. You can also choose a palette below. Preview changes, then save to keep them in this browser on both pages.</p>
-        <form id="backgroundForm">
-          <label>Color palette<select id="backgroundPreset"><option value="image">Match background (automatic)</option><option value="default">Default</option><option value="midnight">Midnight</option><option value="blue">Deep blue</option><option value="forest">Forest</option><option value="plum">Plum</option><option value="custom">Custom theme</option></select></label>
-          <label id="backgroundColorLabel" hidden>Theme color<input id="backgroundColor" type="color" value="#172238"></label>
-          <details id="backgroundGallery" class="backgroundGallery">
-            <summary>Endfield backgrounds <span>32 images</span></summary>
-            <label>Find an operator<input id="backgroundSearch" type="search" placeholder="Search by operator or artwork title" autocomplete="off"></label>
-            <div id="backgroundGalleryGrid" class="backgroundGalleryGrid" aria-label="Endfield background choices"></div>
-            <p id="backgroundGalleryEmpty" hidden>No matching backgrounds.</p>
-          </details>
-          <label class="backgroundUpload">Background image<input id="backgroundFile" type="file" accept="image/jpeg,image/png,image/webp"><span id="backgroundFileName">No image selected · JPG, PNG or WebP, up to 16 MB</span></label>
-          <label>Image overlay <span id="backgroundDimValue">65%</span><input id="backgroundDim" type="range" min="0" max="90" step="5" value="65"><span>Keeps text readable over your image.</span></label>
-          <div class="formactions"><button type="submit" id="saveBackground">Save appearance</button><button type="button" id="removeBackgroundImage" class="secondary" disabled>Remove image</button><button type="button" id="resetBackground" class="ghost">Reset appearance</button></div>
-        </form>
-        <p id="backgroundMessage" role="status"></p>
-      </div>
-      <div id="settingsSecurity" class="settingsPanel passwordSettings" hidden>
-        <h3>Change encryption password</h3>
-        <p>Update the password used to unlock your saved account credentials.</p>
-        <form id="passwordForm">
-          <label>Current password<input id="currentPassword" type="password" autocomplete="current-password" required></label>
-          <label>New password<input id="newPassword" type="password" autocomplete="new-password" required></label>
-          <label>Confirm new password<input id="confirmNewPassword" type="password" autocomplete="new-password" required></label>
-          <div class="formactions"><button id="changePasswordButton" type="submit">Change password</button><span id="passwordMessage" role="status"></span></div>
-        </form>
-      </div>
-    </section>
-    <section id="daily"><div class="sectiontitle"><div class="sectionHeading"><div><h2>Daily progress</h2></div></div><p id="todayLabel" class="muted"></p></div><div id="dailyGrid" class="grid"></div></section>
-    <section id="weekly"><div class="sectiontitle"><div class="sectionHeading"><div><h2>Weekly progress</h2></div></div><p id="weekLabel" class="muted"></p></div><div id="weeklyGrid" class="grid"></div></section>
-    <section id="events" hidden>
-      <div class="sectiontitle"><div><h2>Ongoing events</h2></div><span id="eventsSummary" class="muted" role="status">Loading calendars…</span></div>
-      <p id="eventsMessage" class="eventsMessage" role="status"></p>
-      <div id="eventsGrid" class="eventsGrid"></div>
-    </section>
-    <section id="activity" hidden><div class="sectiontitle"><div class="sectionHeading"><div><h2>History</h2></div></div></div><h3 id="historyDailyHeading" class="historytitle">Daily</h3>
-      <nav id="historyDailyControls" class="historyControls" aria-label="Daily history pages">
-        <label class="historyPageSize">Entries per page <select id="historyDailySize"><option value="1">1</option><option value="3">3</option><option value="5">5</option><option value="10" selected>10</option><option value="25">25</option><option value="all">All</option></select></label>
-        <div class="historyPager"><button id="historyDailyPrev" class="secondary pageArrow" aria-label="Previous daily history page" aria-controls="history">←</button><span id="historyDailyStatus" class="historyPageStatus" role="status"></span><button id="historyDailyNext" class="secondary pageArrow" aria-label="Next daily history page" aria-controls="history">→</button></div>
-      </nav>
-      <div id="history" class="history"></div>
-      <nav id="historyDailyBottom" class="historyBottom" aria-label="Daily history bottom pages"><span id="historyDailyRange" class="historyRange"></span><div class="historyPager"><button id="historyDailyBottomPrev" class="secondary pageArrow" aria-label="Previous daily history page" aria-controls="history">←</button><span id="historyDailyBottomStatus" class="historyPageStatus"></span><button id="historyDailyBottomNext" class="secondary pageArrow" aria-label="Next daily history page" aria-controls="history">→</button></div></nav><h3 id="historyWeeklyHeading" class="historytitle">Weekly</h3>
-      <nav id="historyWeeklyControls" class="historyControls" aria-label="Weekly history pages">
-        <label class="historyPageSize">Entries per page <select id="historyWeeklySize"><option value="1">1</option><option value="3" selected>3</option><option value="5">5</option><option value="10">10</option><option value="25">25</option><option value="all">All</option></select></label>
-        <div class="historyPager"><button id="historyWeeklyPrev" class="secondary pageArrow" aria-label="Previous weekly history page" aria-controls="weeklyHistory">←</button><span id="historyWeeklyStatus" class="historyPageStatus" role="status"></span><button id="historyWeeklyNext" class="secondary pageArrow" aria-label="Next weekly history page" aria-controls="weeklyHistory">→</button></div>
-      </nav>
-      <div id="weeklyHistory" class="history"></div>
-      <nav id="historyWeeklyBottom" class="historyBottom" aria-label="Weekly history bottom pages"><span id="historyWeeklyRange" class="historyRange"></span><div class="historyPager"><button id="historyWeeklyBottomPrev" class="secondary pageArrow" aria-label="Previous weekly history page" aria-controls="weeklyHistory">←</button><span id="historyWeeklyBottomStatus" class="historyPageStatus"></span><button id="historyWeeklyBottomNext" class="secondary pageArrow" aria-label="Next weekly history page" aria-controls="weeklyHistory">→</button></div></nav></section>
-  </main>
-  <footer><span class="footerBrand"><img src="/logo.png" alt="" width="28" height="28"> Chinaslop Tracker</span><span>Snapshots from HoYoLAB &amp; SKPORT · Game data may update with a delay.</span></footer>
-  <script src="/app.js" type="module"></script>
-</body></html>
+        <p class="small">
+          This password is not saved. You will enter it each time the tracker starts. Keep it
+          somewhere safe; an encrypted file cannot be recovered without it.
+        </p>
+      </section>
+      <section id="setup" class="setup" hidden>
+        <h2>Connect your accounts</h2>
+        <p>
+          Add your HoYoLAB session cookie and SKPORT token in Settings to fetch progress. Tokens
+          stay in this folder on your computer.
+        </p>
+        <button id="setupSettings">Open Settings</button>
+      </section>
+      <section id="settings" class="settings" hidden>
+        <div class="sectiontitle">
+          <h2>Settings</h2>
+          <button id="closeSettings" class="ghost">Close</button>
+        </div>
+        <nav class="settingsNav" aria-label="Settings sections">
+          <button
+            type="button"
+            data-settings-panel="accounts"
+            aria-controls="settingsAccounts"
+            aria-pressed="true"
+          >
+            Accounts
+          </button>
+          <button
+            type="button"
+            data-settings-panel="appearance"
+            aria-controls="settingsAppearance"
+            aria-pressed="false"
+          >
+            Appearance
+          </button>
+          <button
+            type="button"
+            data-settings-panel="security"
+            aria-controls="settingsSecurity"
+            aria-pressed="false"
+          >
+            Security
+          </button>
+        </nav>
+        <div id="settingsAccounts" class="settingsPanel">
+          <p class="settingsIntro">
+            Saved values stay hidden. Leave a field blank to keep its saved value.
+          </p>
+          <form id="settingsForm" class="accountSettingsForm">
+            <fieldset class="accountGroup">
+              <legend>HoYoLAB</legend>
+              <p>Genshin Impact, Honkai: Star Rail &amp; Zenless Zone Zero</p>
+              <div class="accountFields">
+                <label
+                  >HoYoLAB token value <span id="hoyoStatus"></span
+                  ><input
+                    id="hoyoCookie"
+                    type="text"
+                    autocomplete="off"
+                    spellcheck="false"
+                    placeholder="Paste the ltoken_v2 value only" /></label
+                ><label
+                  >HoYoLAB account ID value <span id="hoyoUidStatus"></span
+                  ><input
+                    id="hoyoUid"
+                    type="text"
+                    inputmode="numeric"
+                    autocomplete="off"
+                    placeholder="Paste the ltuid_v2 value only"
+                /></label>
+              </div>
+              <div class="guides">
+                <details>
+                  <summary>How to get your HoYoLAB cookie</summary>
+                  <p>Copy two cookie values from your signed-in HoYoLAB browser session.</p>
+                  <ol>
+                    <li>
+                      Open
+                      <a
+                        href="https://www.hoyolab.com/accountCenter"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        >HoYoLAB Account Center</a
+                      >
+                      in Chrome or Edge and sign in.
+                    </li>
+                    <li>
+                      Open Developer Tools with <kbd>⌥</kbd> + <kbd>⌘</kbd> + <kbd>I</kbd> on Mac,
+                      or <kbd>F12</kbd> on Windows.
+                    </li>
+                    <li>
+                      Open
+                      <strong>Application → Storage → Cookies → https://www.hoyolab.com</strong>.
+                    </li>
+                    <li>
+                      Find <code>ltoken_v2</code>. Copy only its <strong>Value</strong> and paste it
+                      into <strong>HoYoLAB token value</strong> below.
+                    </li>
+                    <li>
+                      Find <code>ltuid_v2</code>. Copy only its <strong>Value</strong> and paste it
+                      into <strong>HoYoLAB account ID value</strong>.
+                    </li>
+                    <li>
+                      Select <strong>Save and sync</strong>. The tracker adds the cookie names and
+                      formatting for you.
+                    </li>
+                  </ol>
+                  <p>
+                    The account ID comes from the <code>ltuid_v2</code> cookie; it is different from
+                    your in-game UID.
+                  </p>
+                </details>
+              </div>
+              <button type="button" id="removeHoyo" class="ghost removeAccount">
+                Remove HoYoLAB
+              </button>
+            </fieldset>
+            <fieldset class="accountGroup">
+              <legend>SKPORT</legend>
+              <p>Arknights: Endfield</p>
+              <div class="accountFields">
+                <label
+                  >SKPORT account token <span id="skportStatus"></span
+                  ><input
+                    id="skportToken"
+                    type="text"
+                    autocomplete="off"
+                    spellcheck="false"
+                    placeholder="Your SKPORT account token"
+                /></label>
+              </div>
+              <div class="guides">
+                <details>
+                  <summary>How to get your SKPORT account token</summary>
+                  <p>Copy the account token from your signed-in SKPORT session.</p>
+                  <ol>
+                    <li>
+                      Open
+                      <a
+                        href="https://game.skport.com/endfield/sign-in"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        >SKPORT’s Endfield portal</a
+                      >
+                      and sign in with the Gryphline account linked to Endfield.
+                    </li>
+                    <li>
+                      In the same browser and profile, open
+                      <a
+                        href="https://web-api.skport.com/cookie_store/account_token"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        >SKPORT’s account-token page</a
+                      >.
+                    </li>
+                    <li>
+                      Copy the full JSON response, or just its <code>data.content</code> value.
+                    </li>
+                    <li>
+                      Paste it into the <strong>SKPORT account token</strong> field, then select
+                      <strong>Save and sync</strong>.
+                    </li>
+                  </ol>
+                  <p>
+                    If the page shows an error or an empty result, sign in again at the Endfield
+                    portal using the same browser profile, then reload the token page.
+                  </p>
+                </details>
+              </div>
+              <button type="button" id="removeSkport" class="ghost removeAccount">
+                Remove SKPORT
+              </button>
+            </fieldset>
+            <fieldset class="refreshGroup">
+              <legend>Automatic refresh</legend>
+              <div class="refreshFields">
+                <label
+                  >Refresh interval<select id="pollMinutes">
+                    <option value="5">5 minutes</option>
+                    <option value="10">10 minutes</option>
+                    <option value="30" selected>30 minutes</option>
+                    <option value="60">60 minutes</option>
+                    <option value="120">2 hours</option>
+                    <option value="240">4 hours</option>
+                    <option value="480">8 hours</option>
+                    <option value="custom">Custom</option>
+                  </select></label
+                ><label id="customInterval" hidden
+                  >Custom interval (minutes)<input
+                    id="customPollMinutes"
+                    type="number"
+                    min="1"
+                    max="1440"
+                    step="1"
+                    value="15"
+                    disabled
+                  /><span>1–1,440 minutes (up to 24 hours)</span></label
+                >
+              </div>
+            </fieldset>
+            <fieldset class="refreshGroup">
+              <legend>Daily check-in</legend>
+              <label class="autoCheckInToggle"
+                ><input id="autoCheckIn" type="checkbox" /> Automatically check in every day</label
+              >
+              <p class="small">
+                Runs for all connected games while the tracker is running and unlocked. Checks on
+                unlock and once an hour; completed check-ins are skipped.
+              </p>
+              <p id="autoCheckInStatus" class="small" role="status"></p>
+            </fieldset>
+            <div class="formactions"><button type="submit">Save and sync</button></div>
+          </form>
+          <p class="small">
+            Account values are encrypted on this computer. Keep them private. Check-in rewards are
+            claimed when you use Check in or enable automatic check-in.
+          </p>
+        </div>
+        <div id="settingsAppearance" class="settingsPanel backgroundSettings" hidden>
+          <h3>Appearance</h3>
+          <p>
+            Selecting an image automatically matches the palette to its colors. You can also choose
+            a palette below. Preview changes, then save to keep them in this browser on both pages.
+          </p>
+          <form id="backgroundForm">
+            <label
+              >Color palette<select id="backgroundPreset">
+                <option value="image">Match background (automatic)</option>
+                <option value="default">Default</option>
+                <option value="midnight">Midnight</option>
+                <option value="blue">Deep blue</option>
+                <option value="forest">Forest</option>
+                <option value="plum">Plum</option>
+                <option value="custom">Custom theme</option>
+              </select></label
+            >
+            <label id="backgroundColorLabel" hidden
+              >Theme color<input id="backgroundColor" type="color" value="#172238"
+            /></label>
+            <details id="backgroundGallery" class="backgroundGallery">
+              <summary>Endfield backgrounds <span>32 images</span></summary>
+              <label
+                >Find an operator<input
+                  id="backgroundSearch"
+                  type="search"
+                  placeholder="Search by operator or artwork title"
+                  autocomplete="off"
+              /></label>
+              <div
+                id="backgroundGalleryGrid"
+                class="backgroundGalleryGrid"
+                aria-label="Endfield background choices"
+              ></div>
+              <p id="backgroundGalleryEmpty" hidden>No matching backgrounds.</p>
+            </details>
+            <label class="backgroundUpload"
+              >Background image<input
+                id="backgroundFile"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+              /><span id="backgroundFileName"
+                >No image selected · JPG, PNG or WebP, up to 16 MB</span
+              ></label
+            >
+            <label
+              >Image overlay <span id="backgroundDimValue">65%</span
+              ><input id="backgroundDim" type="range" min="0" max="90" step="5" value="65" /><span
+                >Keeps text readable over your image.</span
+              ></label
+            >
+            <div class="formactions">
+              <button type="submit" id="saveBackground">Save appearance</button
+              ><button type="button" id="removeBackgroundImage" class="secondary" disabled>
+                Remove image</button
+              ><button type="button" id="resetBackground" class="ghost">Reset appearance</button>
+            </div>
+          </form>
+          <p id="backgroundMessage" role="status"></p>
+        </div>
+        <div id="settingsSecurity" class="settingsPanel passwordSettings" hidden>
+          <h3>Change encryption password</h3>
+          <p>Update the password used to unlock your saved account credentials.</p>
+          <form id="passwordForm">
+            <label
+              >Current password<input
+                id="currentPassword"
+                type="password"
+                autocomplete="current-password"
+                required
+            /></label>
+            <label
+              >New password<input
+                id="newPassword"
+                type="password"
+                autocomplete="new-password"
+                required
+            /></label>
+            <label
+              >Confirm new password<input
+                id="confirmNewPassword"
+                type="password"
+                autocomplete="new-password"
+                required
+            /></label>
+            <div class="formactions">
+              <button id="changePasswordButton" type="submit">Change password</button
+              ><span id="passwordMessage" role="status"></span>
+            </div>
+          </form>
+        </div>
+      </section>
+      <section id="daily">
+        <div class="sectiontitle">
+          <div class="sectionHeading">
+            <div><h2>Daily progress</h2></div>
+          </div>
+          <p id="todayLabel" class="muted"></p>
+        </div>
+        <div id="dailyGrid" class="grid"></div>
+      </section>
+      <section id="weekly">
+        <div class="sectiontitle">
+          <div class="sectionHeading">
+            <div><h2>Weekly progress</h2></div>
+          </div>
+          <p id="weekLabel" class="muted"></p>
+        </div>
+        <div id="weeklyGrid" class="grid"></div>
+      </section>
+      <section id="events" hidden>
+        <div class="sectiontitle">
+          <div><h2>Ongoing events</h2></div>
+          <span id="eventsSummary" class="muted" role="status">Loading calendars…</span>
+        </div>
+        <p id="eventsMessage" class="eventsMessage" role="status"></p>
+        <div id="eventsGrid" class="eventsGrid"></div>
+      </section>
+      <section id="activity" hidden>
+        <div class="sectiontitle">
+          <div class="sectionHeading">
+            <div><h2>History</h2></div>
+          </div>
+        </div>
+        <h3 id="historyDailyHeading" class="historytitle">Daily</h3>
+        <nav id="historyDailyControls" class="historyControls" aria-label="Daily history pages">
+          <label class="historyPageSize"
+            >Entries per page
+            <select id="historyDailySize">
+              <option value="1">1</option>
+              <option value="3">3</option>
+              <option value="5">5</option>
+              <option value="10" selected>10</option>
+              <option value="25">25</option>
+              <option value="all">All</option>
+            </select></label
+          >
+          <div class="historyPager">
+            <button
+              id="historyDailyPrev"
+              class="secondary pageArrow"
+              aria-label="Previous daily history page"
+              aria-controls="history"
+            >
+              ←</button
+            ><span id="historyDailyStatus" class="historyPageStatus" role="status"></span
+            ><button
+              id="historyDailyNext"
+              class="secondary pageArrow"
+              aria-label="Next daily history page"
+              aria-controls="history"
+            >
+              →
+            </button>
+          </div>
+        </nav>
+        <div id="history" class="history"></div>
+        <nav id="historyDailyBottom" class="historyBottom" aria-label="Daily history bottom pages">
+          <span id="historyDailyRange" class="historyRange"></span>
+          <div class="historyPager">
+            <button
+              id="historyDailyBottomPrev"
+              class="secondary pageArrow"
+              aria-label="Previous daily history page"
+              aria-controls="history"
+            >
+              ←</button
+            ><span id="historyDailyBottomStatus" class="historyPageStatus"></span
+            ><button
+              id="historyDailyBottomNext"
+              class="secondary pageArrow"
+              aria-label="Next daily history page"
+              aria-controls="history"
+            >
+              →
+            </button>
+          </div>
+        </nav>
+        <h3 id="historyWeeklyHeading" class="historytitle">Weekly</h3>
+        <nav id="historyWeeklyControls" class="historyControls" aria-label="Weekly history pages">
+          <label class="historyPageSize"
+            >Entries per page
+            <select id="historyWeeklySize">
+              <option value="1">1</option>
+              <option value="3" selected>3</option>
+              <option value="5">5</option>
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="all">All</option>
+            </select></label
+          >
+          <div class="historyPager">
+            <button
+              id="historyWeeklyPrev"
+              class="secondary pageArrow"
+              aria-label="Previous weekly history page"
+              aria-controls="weeklyHistory"
+            >
+              ←</button
+            ><span id="historyWeeklyStatus" class="historyPageStatus" role="status"></span
+            ><button
+              id="historyWeeklyNext"
+              class="secondary pageArrow"
+              aria-label="Next weekly history page"
+              aria-controls="weeklyHistory"
+            >
+              →
+            </button>
+          </div>
+        </nav>
+        <div id="weeklyHistory" class="history"></div>
+        <nav
+          id="historyWeeklyBottom"
+          class="historyBottom"
+          aria-label="Weekly history bottom pages"
+        >
+          <span id="historyWeeklyRange" class="historyRange"></span>
+          <div class="historyPager">
+            <button
+              id="historyWeeklyBottomPrev"
+              class="secondary pageArrow"
+              aria-label="Previous weekly history page"
+              aria-controls="weeklyHistory"
+            >
+              ←</button
+            ><span id="historyWeeklyBottomStatus" class="historyPageStatus"></span
+            ><button
+              id="historyWeeklyBottomNext"
+              class="secondary pageArrow"
+              aria-label="Next weekly history page"
+              aria-controls="weeklyHistory"
+            >
+              →
+            </button>
+          </div>
+        </nav>
+      </section>
+    </main>
+    <footer>
+      <span class="footerBrand"
+        ><img src="/logo.png" alt="" width="28" height="28" /> Chinaslop Tracker</span
+      ><span>Snapshots from HoYoLAB &amp; SKPORT · Game data may update with a delay.</span>
+    </footer>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

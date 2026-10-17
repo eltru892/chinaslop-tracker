@@ -9,4 +9,6 @@ export function weekStart(date) {
   return start;
 }
 
-export function weekKey(date) { return localDateKey(weekStart(date)); }
+export function weekKey(date) {
+  return localDateKey(weekStart(date));
+}

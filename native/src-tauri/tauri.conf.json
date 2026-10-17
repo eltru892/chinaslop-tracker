@@ -4,7 +4,13 @@
   "version": "1.0.1",
   "identifier": "local.chinaslop.tracker",
   "build": { "frontendDist": "../loading" },
-  "app": { "windows": [], "security": { "capabilities": [], "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'" } },
+  "app": {
+    "windows": [],
+    "security": {
+      "capabilities": [],
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'"
+    }
+  },
   "bundle": {
     "active": true,
     "targets": ["nsis"],

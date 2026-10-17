@@ -37,7 +37,7 @@ The live HoYoLAB ZZZ notes response checked on October 16, 2026 included normal 
 
 Unavailable fields show **Not exposed** or a service error. They are never counted as incomplete. The latest snapshot for each day and each week is used for the history view. The week is grouped by local Monday; in-game resets follow each game's server clock, so a snapshot near reset can straddle two displayed weeks.
 
-HoYoLAB and SKPORT game data endpoints are used by their own apps but are not published as stable public developer APIs. Their response fields, authentication, or rate limits may change. This app keeps each connector isolated so it can be updated if needed. 
+HoYoLAB and SKPORT game data endpoints are used by their own apps but are not published as stable public developer APIs. Their response fields, authentication, or rate limits may change. This app keeps each connector isolated so it can be updated if needed.
 
 ## Events
 

@@ -1,0 +1,13 @@
+{
+  "name": "chinaslop-tracker-tools",
+  "private": true,
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "format:rust": "cargo fmt --manifest-path native/src-tauri/Cargo.toml",
+    "test": "node --test tracker/*.test.mjs"
+  },
+  "devDependencies": {
+    "prettier": "3.9.10"
+  }
+}

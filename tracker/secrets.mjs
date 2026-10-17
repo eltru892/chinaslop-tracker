@@ -11,11 +11,14 @@ export function encryptSecrets(secrets, passphrase) {
   const iv = crypto.randomBytes(12);
   const key = crypto.scryptSync(passphrase, salt, 32, SCRYPT);
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-  const plaintext = Buffer.from(JSON.stringify({
-    hoyolabCookie: String(secrets.hoyolabCookie || ''),
-    skportToken: String(secrets.skportToken || ''),
-    ...(secrets.hoyolabUid ? { hoyolabUid:String(secrets.hoyolabUid) } : {})
-  }), 'utf8');
+  const plaintext = Buffer.from(
+    JSON.stringify({
+      hoyolabCookie: String(secrets.hoyolabCookie || ''),
+      skportToken: String(secrets.skportToken || ''),
+      ...(secrets.hoyolabUid ? { hoyolabUid: String(secrets.hoyolabUid) } : {}),
+    }),
+    'utf8',
+  );
   const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
   const tag = cipher.getAuthTag();
   key.fill(0);
@@ -29,7 +32,7 @@ export function encryptSecrets(secrets, passphrase) {
     tag: tag.toString('base64'),
     data: ciphertext.toString('base64'),
     hasHoyo: !!secrets.hoyolabCookie,
-    hasSkport: !!secrets.skportToken
+    hasSkport: !!secrets.skportToken,
   };
 }
 
@@ -40,21 +43,31 @@ export function decryptSecrets(envelope, passphrase) {
   const salt = Buffer.from(envelope.salt, 'base64');
   const iv = Buffer.from(envelope.iv, 'base64');
   const tag = Buffer.from(envelope.tag, 'base64');
-  if (salt.length !== 16 || iv.length !== 12 || tag.length !== 16) throw new Error('Invalid encrypted secrets file');
+  if (salt.length !== 16 || iv.length !== 12 || tag.length !== 16)
+    throw new Error('Invalid encrypted secrets file');
   const key = crypto.scryptSync(passphrase, salt, 32, SCRYPT);
   try {
     const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
     decipher.setAuthTag(tag);
-    const plaintext = Buffer.concat([decipher.update(Buffer.from(envelope.data, 'base64')), decipher.final()]);
+    const plaintext = Buffer.concat([
+      decipher.update(Buffer.from(envelope.data, 'base64')),
+      decipher.final(),
+    ]);
     try {
       const result = JSON.parse(plaintext.toString('utf8'));
-      if (typeof result.hoyolabCookie !== 'string' || typeof result.skportToken !== 'string') throw new Error('Invalid secrets data');
-      if (result.hoyolabUid !== undefined && typeof result.hoyolabUid !== 'string') throw new Error('Invalid account ID');
+      if (typeof result.hoyolabCookie !== 'string' || typeof result.skportToken !== 'string')
+        throw new Error('Invalid secrets data');
+      if (result.hoyolabUid !== undefined && typeof result.hoyolabUid !== 'string')
+        throw new Error('Invalid account ID');
       return result;
-    } finally { plaintext.fill(0); }
+    } finally {
+      plaintext.fill(0);
+    }
   } catch {
     throw new Error('Incorrect encryption password or damaged secrets file');
-  } finally { key.fill(0); }
+  } finally {
+    key.fill(0);
+  }
 }
 
 export async function writeEncryptedFile(filePath, envelope) {

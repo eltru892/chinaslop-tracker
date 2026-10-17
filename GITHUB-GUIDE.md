@@ -2,19 +2,19 @@
 
 ## What each part means
 
-| GitHub term | What it means here |
-| --- | --- |
+| GitHub term         | What it means here                                                          |
+| ------------------- | --------------------------------------------------------------------------- |
 | Repository, or repo | Your project's online folder: https://github.com/eltru892/chinaslop-tracker |
-| Code | The source files used to build the tracker |
-| README | The project's front page and setup instructions |
-| Commit | A saved snapshot of changes, with a short explanation |
-| Clone | Make a working copy of the repository on your computer |
-| Push | Upload your local commits to GitHub |
-| Pull | Download newer commits into your local copy |
-| Release | A named app version with downloadable EXE/APK files |
-| Tag | A version label, such as `v1.0.0`, pointing to a commit |
-| Issues | Bug reports and feature requests |
-| Actions | Automated checks; this repository runs its tests here |
+| Code                | The source files used to build the tracker                                  |
+| README              | The project's front page and setup instructions                             |
+| Commit              | A saved snapshot of changes, with a short explanation                       |
+| Clone               | Make a working copy of the repository on your computer                      |
+| Push                | Upload your local commits to GitHub                                         |
+| Pull                | Download newer commits into your local copy                                 |
+| Release             | A named app version with downloadable EXE/APK files                         |
+| Tag                 | A version label, such as `v1.0.0`, pointing to a commit                     |
+| Issues              | Bug reports and feature requests                                            |
+| Actions             | Automated checks; this repository runs its tests here                       |
 
 ## Download and use the app
 

@@ -43,6 +43,17 @@ GitHub Pages cannot run this local Node.js server. Use the downloads or run the 
 
 ## Tests
 
+For consistent formatting, install pnpm 11.25.0 and run these commands from the repository root:
+
+```sh
+pnpm install --frozen-lockfile --ignore-scripts
+pnpm format
+pnpm format:check
+pnpm format:rust
+```
+
+Prettier formats the JavaScript, HTML, CSS, JSON, YAML, and Markdown source. Rust uses `rustfmt` (install with `rustup component add rustfmt`). Generated files, downloaded assets, and personal data are excluded. CI checks formatting and runs the tests.
+
 From the repository root:
 
 ```sh
@@ -59,13 +70,13 @@ The published v1.0.0 downloads above are the previous Electron/Android builds. R
 
 ## Project layout
 
-| Folder | Purpose |
-| --- | --- |
-| `tracker` | Shared web UI, server, connectors, assets and tests |
-| `native` | Tauri Windows and Android applications |
-| `desktop` | Legacy Electron wrapper and original icon assets |
+| Folder    | Purpose                                                      |
+| --------- | ------------------------------------------------------------ |
+| `tracker` | Shared web UI, server, connectors, assets and tests          |
+| `native`  | Tauri Windows and Android applications                       |
+| `desktop` | Legacy Electron wrapper and original icon assets             |
 | `android` | Embedded Node/JNI bridge, runtime notices and legacy wrapper |
-| `scripts` | Clean asset preparation and runtime download |
+| `scripts` | Clean asset preparation and runtime download                 |
 
 ## Privacy and sources
 
