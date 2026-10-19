@@ -1,4 +1,4 @@
-import { weekStart, weekKey } from './history-dates.mjs';
+import { weekStart } from './history-dates.mjs';
 import {
   resourceCountdown,
   dailyResetInfo,
@@ -759,12 +759,13 @@ function historyEntry(snapshot, kind, date) {
       game,
       items: items.length ? items : [{ label: 'Progress', value: null }],
       error: data?.error,
+      missing: !data,
     };
   });
   const tracks = Math.max(...entries.map((entry) => entry.items.length)) * 2;
   line.style.setProperty('--history-lines', String(tracks));
   line.append(el('span', 'historyDate', date));
-  for (const { game, items, error } of entries) {
+  for (const { game, items, error, missing } of entries) {
     const cell = el('div', `historyCell game-${game}`);
     cell.append(el('h4', 'historyGameName', names[game]));
     for (const item of items) {
@@ -787,28 +788,85 @@ function historyEntry(snapshot, kind, date) {
               : ' · Unclaimed'
           : '';
       cell.append(
-        el('strong', 'historyMetricValue', `${error ? 'Error' : progressText(item)}${reward}`),
+        el(
+          'strong',
+          'historyMetricValue',
+          `${missing ? 'No record' : error ? 'Error' : progressText(item)}${reward}`,
+        ),
       );
     }
     line.append(cell);
   }
   return line;
 }
-let historyList = [];
+let historyAccounts = [];
+let historyCurrent = {};
+let historySelections = {};
+try {
+  historySelections = JSON.parse(localStorage.getItem('tracker-history-accounts') || '{}') || {};
+} catch {}
+let historyAccountSignature = '';
+const historyRequests = { daily: 0, weekly: 0 };
+function renderHistoryAccounts() {
+  const signature = JSON.stringify([historyAccounts, historyCurrent, historySelections]);
+  if (signature === historyAccountSignature) return;
+  historyAccountSignature = signature;
+  const controls = $('historyAccounts');
+  controls.replaceChildren();
+  for (const game of order) {
+    const label = el('label', 'historyAccountPicker', names[game]);
+    const select = el('select');
+    select.setAttribute('aria-label', `${names[game]} history account`);
+    const accounts = historyAccounts.filter((account) => account.game === game);
+    const defaultAccount =
+      accounts.find((account) => account.id === historyCurrent[game]) || accounts[0];
+    const describe = (account) =>
+      account.legacy
+        ? 'Legacy history'
+        : `${account.nickname || account.uid} · ${serverName(game, account.region)} Server · UID ${account.uid}`;
+    const current = el(
+      'option',
+      '',
+      defaultAccount
+        ? `${historyCurrent[game] ? 'Current' : 'Most recent'}: ${describe(defaultAccount)}`
+        : 'No saved accounts',
+    );
+    current.value = 'current';
+    select.append(current);
+    for (const account of accounts) {
+      const option = el('option', '', describe(account));
+      option.value = account.id;
+      select.append(option);
+    }
+    if (!accounts.some((account) => account.id === historySelections[game]))
+      delete historySelections[game];
+    select.value = historySelections[game] || 'current';
+    select.disabled = accounts.length === 0;
+    select.addEventListener('change', () => {
+      if (select.value === 'current') delete historySelections[game];
+      else historySelections[game] = select.value;
+      try {
+        localStorage.setItem('tracker-history-accounts', JSON.stringify(historySelections));
+      } catch {}
+      historyPages.daily.page = historyPages.weekly.page = 0;
+      void loadHistoryPages();
+    });
+    label.append(select);
+    controls.append(label);
+  }
+}
 const mobileHistory = window.matchMedia('(max-width:700px)').matches;
 const historyPages = {
   daily: { page: 0, size: mobileHistory ? '1' : '10' },
   weekly: { page: 0, size: mobileHistory ? '1' : '3' },
 };
-function renderHistoryPage(kind, rows, containerId) {
+function renderHistoryPage(kind, result, containerId) {
   const prefix = kind === 'daily' ? 'historyDaily' : 'historyWeekly';
   const state = historyPages[kind];
   $(prefix + 'Size').value = state.size;
-  const size = state.size === 'all' ? Math.max(rows.length, 1) : Number(state.size);
-  const pageCount = Math.max(1, Math.ceil(rows.length / size));
-  state.page = Math.max(0, Math.min(state.page, pageCount - 1));
-  const offset = state.page * size;
-  const visible = rows.slice(offset, offset + size);
+  const { rows: visible, total, pages: pageCount, page, pageSize: size } = result;
+  state.page = page;
+  const offset = page * size;
   const container = $(containerId);
   container.replaceChildren();
   const header = el('div', 'historyrow head');
@@ -821,48 +879,79 @@ function renderHistoryPage(kind, rows, containerId) {
   ])
     header.append(el('span', '', text));
   container.append(header);
-  if (!rows.length)
-    container.append(el('p', 'historyEmpty', 'No snapshots yet. Connect accounts and refresh.'));
-  for (const { snapshot, date } of visible) container.append(historyEntry(snapshot, kind, date));
+  if (!total)
+    container.append(
+      el(
+        'p',
+        'historyEmpty',
+        'No history for the selected accounts. Choose a previous account above or connect and refresh.',
+      ),
+    );
+  for (const { snapshot, date } of visible) {
+    let label = date;
+    if (kind === 'weekly') {
+      const start = new Date(`${date}T12:00:00`);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 7);
+      const format = (value) =>
+        value.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      label = `${format(start)} – ${format(end)}`;
+    }
+    container.append(historyEntry(snapshot, kind, label));
+  }
   const status = `Page ${state.page + 1} of ${pageCount}`;
   $(prefix + 'Status').textContent = status;
   $(prefix + 'BottomStatus').textContent = status;
-  $(prefix + 'Range').textContent = rows.length
-    ? `${offset + 1}–${Math.min(offset + size, rows.length)} of ${rows.length} ${kind === 'daily' ? 'days' : 'weeks'}`
+  $(prefix + 'Range').textContent = total
+    ? `${offset + 1}–${Math.min(offset + size, total)} of ${total} ${kind === 'daily' ? 'days' : 'weeks'}`
     : 'No entries';
   for (const suffix of ['Prev', 'BottomPrev']) $(prefix + suffix).disabled = state.page === 0;
   for (const suffix of ['Next', 'BottomNext'])
     $(prefix + suffix).disabled = state.page >= pageCount - 1;
   $(prefix + 'Bottom').hidden = pageCount <= 1;
 }
-function renderHistory(list) {
-  historyList = list;
-  const latestByDay = new Map();
-  const latestByWeek = new Map();
-  for (const row of list) {
-    latestByDay.set(localDay(row.at), row);
-    latestByWeek.set(weekKey(new Date(row.at)), row);
-  }
-  const days = [...latestByDay.values()]
-    .reverse()
-    .map((snapshot) => ({ snapshot, date: localDay(snapshot.at) }));
-  const formatDate = (value) =>
-    value.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  const weeks = [...latestByWeek.entries()].reverse().map(([date, snapshot]) => {
-    const start = new Date(`${date}T12:00:00`);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 7);
-    return { snapshot, date: `${formatDate(start)} – ${formatDate(end)}` };
+async function loadHistoryPage(kind) {
+  if (!isHistoryPage) return;
+  const sequence = ++historyRequests[kind];
+  const containerId = kind === 'daily' ? 'history' : 'weeklyHistory';
+  const state = historyPages[kind];
+  const params = new URLSearchParams({
+    kind,
+    page: state.page,
+    size: state.size,
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   });
-  renderHistoryPage('daily', days, 'history');
-  renderHistoryPage('weekly', weeks, 'weeklyHistory');
+  for (const game of order) {
+    const accounts = historyAccounts.filter((account) => account.game === game);
+    params.set(game, historySelections[game] || historyCurrent[game] || accounts[0]?.id || '');
+  }
+  $(containerId).setAttribute('aria-busy', 'true');
+  try {
+    const result = await api(`/api/history?${params}`);
+    if (sequence === historyRequests[kind]) renderHistoryPage(kind, result, containerId);
+  } catch (error) {
+    if (sequence === historyRequests[kind]) notice(`Could not load history: ${error.message}`);
+  } finally {
+    if (sequence === historyRequests[kind]) $(containerId).setAttribute('aria-busy', 'false');
+  }
+}
+async function loadHistoryPages() {
+  await Promise.all(['daily', 'weekly'].map(loadHistoryPage));
+}
+async function loadHistory() {
+  if (!isHistoryPage) return;
+  const result = await api('/api/history/accounts');
+  historyAccounts = result.accounts;
+  historyCurrent = result.current;
+  renderHistoryAccounts();
+  await loadHistoryPages();
 }
 for (const kind of ['daily', 'weekly']) {
   const prefix = kind === 'daily' ? 'historyDaily' : 'historyWeekly';
   $(prefix + 'Size').addEventListener('change', (event) => {
     historyPages[kind].size = event.target.value;
     historyPages[kind].page = 0;
-    renderHistory(historyList);
+    void loadHistoryPage(kind);
   });
   for (const [suffix, direction] of [
     ['Prev', -1],
@@ -872,7 +961,7 @@ for (const kind of ['daily', 'weekly']) {
   ]) {
     $(prefix + suffix).addEventListener('click', () => {
       historyPages[kind].page += direction;
-      renderHistory(historyList);
+      void loadHistoryPage(kind);
       $(prefix + 'Controls').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }
@@ -1000,7 +1089,7 @@ async function load() {
                 : 'Waiting for a connected account.');
     setRefreshState(state.syncing, locked);
     notice(state.lastError ? `Refresh issue: ${state.lastError}` : '');
-    renderHistory(await api('/api/history'));
+    if (isHistoryPage) await loadHistory();
     if (isEventsPage) void loadEvents();
   } catch (error) {
     setRefreshState(false);

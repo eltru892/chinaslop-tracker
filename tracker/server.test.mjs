@@ -271,3 +271,99 @@ test('packaged runtime separates private storage and requires its app session', 
   assert.equal(state.security.locked, false);
   assert.equal(JSON.stringify(state).includes('fake-test-session'), false);
 });
+
+test('switching credentials and disconnecting cannot restore an in-flight old account; previous history remains selectable', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'tracker-switch-'));
+  for (const file of await fs.readdir(new URL('.', import.meta.url))) {
+    if (file.endsWith('.mjs') && !file.endsWith('.test.mjs'))
+      await fs.copyFile(new URL(file, import.meta.url), path.join(root, file));
+  }
+  await fs.writeFile(
+    path.join(root, 'collector.mjs'),
+    `
+    import fs from 'node:fs/promises';
+    import {setTimeout} from 'node:timers/promises';
+    const root = new URL('.', import.meta.url);
+    export function hoyoHeaders(){return {}}; export function skportHeaders(){return {}};
+    export async function getSkportContext(){throw new Error('Test network disabled')};
+    export async function collect(config){
+      if(await fs.stat(new URL('hold',root)).catch(()=>false)) {
+        await fs.writeFile(new URL('inflight',root),'ready');
+        while(!await fs.stat(new URL('release',root)).catch(()=>false)) await setTimeout(10);
+      }
+      const uid = config.hoyolabCookie?.includes('ltoken_v2=account-A') ? 'A' : 'B';
+      return {at:new Date().toISOString(),games:{genshin:config.hoyolabCookie
+        ? {identity:{uid,region:'os_usa',nickname:uid},daily:[{label:'Daily',value:{current:4,total:4}}]}
+        : {error:'Connect HoYoLAB in Settings'}}};
+    }`,
+  );
+  const child = spawn(process.execPath, [path.join(root, 'server.mjs')], {
+    env: { ...process.env, PORT: '0' },
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+  });
+  t.after(async () => {
+    if (child.exitCode === null) {
+      child.kill();
+      await once(child, 'exit');
+    }
+    await fs.rm(root, { recursive: true, force: true });
+  });
+  const ready = await Promise.race([
+    once(child, 'message').then(([value]) => value),
+    new Promise((_, reject) => {
+      const timer = setTimeout(() => reject(new Error('Server did not start')), 5000);
+      timer.unref();
+    }),
+  ]);
+  const origin = `http://127.0.0.1:${ready.port}`;
+  async function api(route, body) {
+    const response = await fetch(
+      origin + route,
+      body
+        ? {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          }
+        : {},
+    );
+    assert.equal(response.status, 200);
+    return response.json();
+  }
+  async function settled(uid) {
+    for (let i = 0; i < 100; i++) {
+      const state = await api('/api/state');
+      if (!state.syncing && (!uid || state.latest?.games.genshin.identity?.uid === uid))
+        return state;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    throw new Error('Sync did not settle');
+  }
+  await api('/api/unlock', { passphrase: 'test' });
+  await api('/api/settings', { hoyolabUid: '123', hoyolabToken: 'account-A' });
+  await settled('A');
+  const first = (await api('/api/history/accounts')).current.genshin;
+  await api('/api/settings', { hoyolabToken: 'account-B' });
+  await settled('B');
+  assert.equal(
+    (await api(`/api/history?genshin=${first}`)).rows[0].snapshot.games.genshin.identity.uid,
+    'A',
+  );
+  await fs.writeFile(path.join(root, 'hold'), '');
+  const pending = api('/api/sync', {});
+  for (let i = 0; !(await fs.stat(path.join(root, 'inflight')).catch(() => false)); i++) {
+    assert.ok(i < 100);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  await api('/api/settings', { removeHoyo: true });
+  assert.equal((await api('/api/state')).latest.games.genshin.identity, undefined);
+  await fs.writeFile(path.join(root, 'release'), '');
+  await pending;
+  const disconnected = await settled();
+  assert.equal(disconnected.latest.games.genshin.identity, undefined);
+  assert.equal((await api('/api/history/accounts')).current.genshin, undefined);
+  assert.equal((await api(`/api/history?genshin=${first}`)).total, 1);
+  await api('/api/settings', { hoyolabUid: '123', hoyolabToken: 'account-A' });
+  await settled('A');
+  assert.equal((await api('/api/history/accounts')).current.genshin, first);
+});
