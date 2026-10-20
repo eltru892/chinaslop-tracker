@@ -1,5 +1,5 @@
 import http from 'node:http';
-import { readHistory, writeHistory, retainHistory, mergeSnapshot } from './history.mjs';
+import { openHistoryStore, mergeSnapshot, HISTORY_GAMES } from './history.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,7 +21,8 @@ const storageRoot = process.env.TRACKER_DATA_DIR
 await fs.mkdir(storageRoot, { recursive: true });
 const configPath = path.join(storageRoot, 'config.local.json');
 const secretsPath = path.join(storageRoot, 'secrets.enc.json');
-const dataPath = path.join(storageRoot, 'data', 'snapshots.jsonl');
+const historyStore = await openHistoryStore(path.join(storageRoot, 'data'));
+let credentialRevision = 0;
 const port = Number(process.env.PORT || 4317);
 const host = '127.0.0.1';
 const accessKey = process.env.TRACKER_ACCESS_KEY || '';
@@ -121,22 +122,32 @@ async function unlock(passphrase) {
   await scheduleAutoCheckIn();
   if (unlockedSecrets.hoyolabCookie || unlockedSecrets.skportToken) sync();
 }
-async function history() {
-  return readHistory(dataPath);
-}
 async function sync() {
   if (syncing || !unlockedSecrets) return;
   syncing = true;
+  const revision = credentialRevision;
+  const credentials = { ...unlockedSecrets };
   try {
-    const incoming = await collect({ ...(await readConfig()), ...unlockedSecrets });
+    const incoming = await collect({ ...(await readConfig()), ...credentials });
+    // A response started before a connection change must never restore the previous account.
+    if (revision !== credentialRevision) return;
+    for (const game of HISTORY_GAMES) {
+      if (!(game === 'endfield' ? credentials.skportToken : credentials.hoyolabCookie)) {
+        incoming.games[game] = {
+          error: `Connect ${game === 'endfield' ? 'SKPORT' : 'HoYoLAB'} in Settings`,
+          disconnected: true,
+        };
+      }
+    }
     const snapshot = mergeSnapshot(latest, incoming);
-    await writeHistory(dataPath, retainHistory([...(await history()), snapshot]));
+    historyStore.record(snapshot);
     latest = snapshot;
     lastError = null;
   } catch (error) {
     lastError = error.message;
   } finally {
     syncing = false;
+    if (revision !== credentialRevision) void sync();
   }
 }
 async function schedule() {
@@ -238,8 +249,31 @@ const server = http.createServer(async (req, res) => {
         },
       });
     }
-    if (url.pathname === '/api/history' && req.method === 'GET')
-      return send(res, 200, await history());
+    if (url.pathname === '/api/history/accounts' && req.method === 'GET')
+      return send(res, 200, { accounts: historyStore.accounts(), current: historyStore.current() });
+    if (url.pathname === '/api/history' && req.method === 'GET') {
+      try {
+        const accounts = Object.fromEntries(
+          HISTORY_GAMES.filter((game) => url.searchParams.has(game)).map((game) => [
+            game,
+            url.searchParams.get(game),
+          ]),
+        );
+        return send(
+          res,
+          200,
+          historyStore.page({
+            kind: url.searchParams.get('kind') || 'daily',
+            page: url.searchParams.get('page') || 0,
+            size: url.searchParams.get('size') || 10,
+            timeZone: url.searchParams.get('timeZone') || 'UTC',
+            accounts,
+          }),
+        );
+      } catch (error) {
+        return send(res, 400, { error: error.message });
+      }
+    }
     if (url.pathname === '/api/sync' && req.method === 'POST') {
       if (!unlockedSecrets) return send(res, 423, { error: 'Unlock encrypted storage first' });
       await schedule();
@@ -291,10 +325,30 @@ const server = http.createServer(async (req, res) => {
       const envelope = encryptSecrets(updatedSecrets, unlockPassword);
       await writeEncryptedFile(secretsPath, envelope);
       encryptedEnvelope = envelope;
+      const hoyoChanged =
+        updatedSecrets.hoyolabCookie !== unlockedSecrets.hoyolabCookie ||
+        updatedSecrets.hoyolabUid !== unlockedSecrets.hoyolabUid;
+      const skportChanged = updatedSecrets.skportToken !== unlockedSecrets.skportToken;
+      const changedGames = [
+        ...(hoyoChanged ? ['genshin', 'hsr', 'zzz'] : []),
+        ...(skportChanged ? ['endfield'] : []),
+      ];
+      if (changedGames.length) {
+        credentialRevision++;
+        for (const game of changedGames)
+          historyStore.clearCurrent(
+            [game],
+            (game === 'endfield' ? updatedSecrets.skportToken : updatedSecrets.hoyolabCookie)
+              ? 'Loading connected account…'
+              : `Connect ${game === 'endfield' ? 'SKPORT' : 'HoYoLAB'} in Settings`,
+          );
+        latest = historyStore.latest();
+      }
       unlockedSecrets = updatedSecrets;
       await writeConfig(config);
       await schedule();
       await scheduleAutoCheckIn();
+      if (changedGames.length) void sync();
       return send(res, 200, { ok: true });
     }
     if (req.method !== 'GET') return send(res, 405, { error: 'Method not allowed' });
@@ -339,10 +393,18 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-const saved = await history();
-await writeHistory(dataPath, saved);
-latest = saved.at(-1) || null;
+latest = historyStore.latest();
 encryptedEnvelope = await readEncryptedFile();
+const initialConfig = await readConfig();
+const disconnectedGames = HISTORY_GAMES.filter((game) =>
+  game === 'endfield'
+    ? !(encryptedEnvelope?.hasSkport || initialConfig.skportToken)
+    : !(encryptedEnvelope?.hasHoyo || initialConfig.hoyolabCookie),
+);
+if (disconnectedGames.length && latest) {
+  historyStore.clearCurrent(disconnectedGames, 'Account disconnected. Connect in Settings.');
+  latest = historyStore.latest();
+}
 await schedule();
 server.listen(port, host, async () => {
   listeningPort = server.address().port;

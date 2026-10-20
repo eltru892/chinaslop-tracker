@@ -8,7 +8,7 @@ This export contains the app source, tests, game icons, and 32 Endfield backgrou
 
 ## Start
 
-Install Node.js 20 or newer if needed, then extract this ZIP. On macOS, double-click `launch.command`; on Windows, double-click `launch.bat`. Or run `node server.mjs` in this folder. Close any other running copy using port 4317 first. Open the local address printed in the terminal (default: `http://127.0.0.1:4317`). Keep the terminal running for automatic refreshes. The app uses Node.js built-in modules and needs no package install.
+Install Node.js 24 or newer if needed, then extract this ZIP. On macOS, double-click `launch.command`; on Windows, double-click `launch.bat`. Or run `node server.mjs` in this folder. Close any other running copy using port 4317 first. Open the local address printed in the terminal (default: `http://127.0.0.1:4317`). Keep the terminal running for automatic refreshes. The app uses Node.js built-in modules and needs no package install.
 
 When the dashboard opens, set an encryption password. Enter it again each time you restart the tracker. In Settings, expand the two **How to get** guides, then paste your own HoYoLAB session cookie and SKPORT account token. The app encrypts both values in `secrets.enc.json` using scrypt and AES-256-GCM. The encryption password is kept only in memory while the tracker runs. `config.local.json` holds only non-secret settings after migration. Both files have user-only permissions. The app binds to `127.0.0.1`; it does not send credentials to any service other than HoYoLAB and SKPORT.
 

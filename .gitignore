@@ -35,3 +35,9 @@ native/src-tauri/gen/
 native/src-tauri/resources/
 __pycache__/
 artifacts/
+
+# Local account history and migration backups
+**/*.sqlite
+**/*.sqlite-wal
+**/*.sqlite-shm
+**/*.pre-sqlite.bak
