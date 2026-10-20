@@ -15,8 +15,6 @@ This first release has passed build, package, signature and local automated chec
 
 Set an encryption password and connect your own accounts on first launch. Downloads contain no saved account credentials, passwords, configuration or personal history.
 
-New to GitHub? Start with the [beginner's guide](GITHUB-GUIDE.md).
-
 ## Features
 
 - Daily and weekly progress, resource recovery timers, and server reset timers.
