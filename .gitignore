@@ -1,3 +1,5 @@
+# Ignore local, generated, and sensitive files that should never be committed.
+
 # Personal account data and local settings
 **/config.local.json
 **/secrets.enc.json
@@ -30,9 +32,9 @@ android/local.properties
 .DS_Store
 
 # Tauri generated resources and compiler output
-native/src-tauri/target/
-native/src-tauri/gen/
-native/src-tauri/resources/
+tauri/src-tauri/target/
+tauri/src-tauri/gen/
+tauri/src-tauri/resources/
 __pycache__/
 artifacts/
 
@@ -41,3 +43,8 @@ artifacts/
 **/*.sqlite-wal
 **/*.sqlite-shm
 **/*.pre-sqlite.bak
+
+# The public artwork catalog is the only source file in the private history directory.
+!tracker/data/
+tracker/data/*
+!tracker/data/backgrounds.js

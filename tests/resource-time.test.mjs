@@ -7,8 +7,8 @@ import {
   dailyResetCountdown,
   weeklyResetInfo,
   weeklyResetCountdown,
-} from './resource-time.mjs';
-import { normalize } from './collector.mjs';
+} from '../tracker/resource-time.mjs';
+import { normalize } from '../tracker/collector.mjs';
 
 const now = 1_800_000_000_000;
 const value = { current: 100, total: 240 };

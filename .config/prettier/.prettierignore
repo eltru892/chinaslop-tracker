@@ -1,0 +1,8 @@
+# Paths are relative to this file in .config/prettier/.
+# Ignore downloaded assets and other non-source content from formatting.
+# Generated files, downloaded tools, binaries and personal data are excluded by .gitignore.
+**/package-lock.json
+../../pnpm-lock.yaml
+**/Cargo.lock
+**/*LICENSE*
+../../tracker/assets/

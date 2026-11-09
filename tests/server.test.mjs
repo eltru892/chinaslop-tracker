@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { encryptSecrets, decryptSecrets } from './secrets.mjs';
+import { encryptSecrets, decryptSecrets } from '../tracker/secrets.mjs';
 
 test('saved ID stays encrypted and is never returned by the settings API', async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'tracker-settings-'));
@@ -23,7 +23,7 @@ test('saved ID stays encrypted and is never returned by the settings API', async
     'official-art.mjs',
     'event-images.mjs',
   ]) {
-    await fs.copyFile(new URL(file, import.meta.url), path.join(root, file));
+    await fs.copyFile(new URL('../tracker/' + file, import.meta.url), path.join(root, file));
   }
   // No real network requests or account credentials are used in this test.
   await fs.writeFile(
@@ -210,7 +210,7 @@ test('packaged runtime separates private storage and requires its app session', 
     'official-art.mjs',
     'event-images.mjs',
   ])
-    await fs.copyFile(new URL(file, import.meta.url), path.join(root, file));
+    await fs.copyFile(new URL('../tracker/' + file, import.meta.url), path.join(root, file));
   await fs.writeFile(path.join(root, 'index.html'), '<title>Test tracker</title>');
   await fs.writeFile(
     path.join(root, 'collector.mjs'),
@@ -274,9 +274,9 @@ test('packaged runtime separates private storage and requires its app session', 
 
 test('switching credentials and disconnecting cannot restore an in-flight old account; previous history remains selectable', async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'tracker-switch-'));
-  for (const file of await fs.readdir(new URL('.', import.meta.url))) {
+  for (const file of await fs.readdir(new URL('../tracker/', import.meta.url))) {
     if (file.endsWith('.mjs') && !file.endsWith('.test.mjs'))
-      await fs.copyFile(new URL(file, import.meta.url), path.join(root, file));
+      await fs.copyFile(new URL('../tracker/' + file, import.meta.url), path.join(root, file));
   }
   await fs.writeFile(
     path.join(root, 'collector.mjs'),

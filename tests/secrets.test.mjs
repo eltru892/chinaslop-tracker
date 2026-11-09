@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { encryptSecrets, decryptSecrets } from './secrets.mjs';
+import { encryptSecrets, decryptSecrets } from '../tracker/secrets.mjs';
 
 test('encrypted values round-trip without appearing in the file', () => {
   const secrets = {

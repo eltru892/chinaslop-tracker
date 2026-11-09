@@ -1,3 +1,4 @@
+# Keep line endings consistent across platforms to avoid noisy diffs.
 * text=auto
 *.js text eol=lf
 *.mjs text eol=lf

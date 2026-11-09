@@ -4,44 +4,33 @@ from pathlib import Path
 import argparse
 import shutil
 import subprocess
-import sys
 import urllib.request
 import re
+from tracker_assets import copy_tracker
 
 root = Path(__file__).resolve().parent.parent
 parser = argparse.ArgumentParser()
 parser.add_argument('--android', action='store_true')
 parser.add_argument('--node', type=Path, help='Windows Node executable to bundle')
 args = parser.parse_args()
-subprocess.run([sys.executable, str(root / 'scripts/prepare.py')], check=True)
-native = root / 'native/src-tauri'
-def copy_tracker(destination):
-    source = root / 'tracker'
-    files = ['index.html', 'app.js', 'style.css', 'logo.png', 'package.json', 'config.example.json']
-    files += [p.name for p in source.glob('*.mjs') if not p.name.endswith('.test.mjs')]
-    files += [p.relative_to(source).as_posix() for p in (source / 'assets').rglob('*') if p.is_file() and not p.is_symlink()]
-    for name in files:
-        target = destination / name
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source / name, target)
-
-copy_tracker(native / 'resources/tracker')
+tauri = root / 'tauri/src-tauri'
+copy_tracker(tauri / 'resources/tracker')
 if args.node:
-    (native / 'resources/runtime').mkdir(parents=True, exist_ok=True)
-    shutil.copy2(args.node, native / 'resources/runtime/node.exe')
+    (tauri / 'resources/runtime').mkdir(parents=True, exist_ok=True)
+    shutil.copy2(args.node, tauri / 'resources/runtime/node.exe')
     version = subprocess.check_output([str(args.node), '--version'], text=True).strip()
-    urllib.request.urlretrieve(f'https://raw.githubusercontent.com/nodejs/node/{version}/LICENSE', native / 'resources/runtime/LICENSE.txt')
+    urllib.request.urlretrieve(f'https://raw.githubusercontent.com/nodejs/node/{version}/LICENSE', tauri / 'resources/runtime/LICENSE.txt')
 if args.android:
-    app = native / 'gen/android/app'
+    app = tauri / 'gen/android/app'
     if not app.exists():
-        raise SystemExit('Run cargo tauri android init in native first.')
+        raise SystemExit('Run cargo tauri android init in tauri first.')
     copy_tracker(app / 'src/main/assets/tracker')
     shutil.copytree(root / 'android/app/src/main/jniLibs', app / 'src/main/jniLibs', dirs_exist_ok=True)
     for license_file in ['NODE-LICENSE.txt', 'LIBCXX-LICENSE.txt']:
         shutil.copy2(root / 'android/app/src/main/assets' / license_file, app / 'src/main/assets' / license_file)
     activity = app / 'src/main/java/local/chinaslop/tracker/MainActivity.kt'
     activity.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(root / 'native/MainActivity.kt', activity)
+    shutil.copy2(root / 'tauri/MainActivity.kt', activity)
     xml = app / 'src/main/res/xml'
     xml.mkdir(parents=True, exist_ok=True)
     shutil.copy2(root / 'android/app/src/main/res/xml/network_security.xml', xml / 'network_security.xml')

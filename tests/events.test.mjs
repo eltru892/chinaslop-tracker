@@ -7,8 +7,8 @@ import {
   createEventService,
   eventImage,
   addAnnouncementImages,
-} from './events.mjs';
-import { eventCountdown } from './resource-time.mjs';
+} from '../tracker/events.mjs';
+import { eventCountdown } from '../tracker/resource-time.mjs';
 const now = Date.UTC(2026, 9, 16, 12),
   sec = (t) => t / 1000;
 const event = (id, start, end) => ({

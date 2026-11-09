@@ -69,6 +69,6 @@ History is a separate page with independent daily and weekly pagination. Desktop
 
 ## Verification
 
-Run `npm test` or `node --test` from the extracted project folder to run the included tests. No package installation is required.
+Automated development tests live in the repository’s top-level `tests/` folder, separate from this app folder. From the full repository root, run `node --test tests/*.test.mjs` (or `npm test`). Tests are not included in packaged apps; no test files are needed to run the tracker.
 
 History retains observations from the last 365 days regardless of refresh interval. Expired records are removed from disk on startup and sync. Damaged history lines are skipped while valid records are recovered. Failed game refreshes retain the last successful progress, labeled with its original observation time and the refresh error.

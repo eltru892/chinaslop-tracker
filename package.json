@@ -1,11 +1,12 @@
 {
   "name": "chinaslop-tracker-tools",
+  "description": "Project metadata and root scripts for formatting, testing, and dependency management.",
   "private": true,
   "scripts": {
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "format:rust": "cargo fmt --manifest-path native/src-tauri/Cargo.toml",
-    "test": "node --test tracker/*.test.mjs"
+    "format": "prettier --write . --config .config/prettier/.prettierrc.json --ignore-path .gitignore --ignore-path .config/prettier/.prettierignore",
+    "format:check": "prettier --check . --config .config/prettier/.prettierrc.json --ignore-path .gitignore --ignore-path .config/prettier/.prettierignore",
+    "format:rust": "cargo fmt --manifest-path tauri/src-tauri/Cargo.toml",
+    "test": "node --test tests/*.test.mjs"
   },
   "devDependencies": {
     "prettier": "3.9.10"

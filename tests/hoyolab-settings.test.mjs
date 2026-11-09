@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { updateHoyoSettings } from './hoyolab-settings.mjs';
+import { updateHoyoSettings } from '../tracker/hoyolab-settings.mjs';
 
 const saved = {
   hoyolabCookie: 'ltoken_v2=old; ltuid_v2=123',

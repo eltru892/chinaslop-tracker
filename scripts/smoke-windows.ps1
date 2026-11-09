@@ -1,4 +1,4 @@
-param([string]$Executable = "$PSScriptRoot/../native/src-tauri/target/release/chinaslop-tracker.exe")
+param([string]$Executable = "$PSScriptRoot/../tauri/src-tauri/target/release/chinaslop-tracker.exe")
 $ErrorActionPreference = 'Stop'
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('chinaslop-smoke-' + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $testRoot | Out-Null

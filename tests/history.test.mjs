@@ -6,7 +6,12 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
-import { openHistoryStore, mergeSnapshot, historyAccount, HISTORY_DAYS } from './history.mjs';
+import {
+  openHistoryStore,
+  mergeSnapshot,
+  historyAccount,
+  HISTORY_DAYS,
+} from '../tracker/history.mjs';
 
 const now = Date.now();
 const progress = (uid = '111', region = 'os_usa', current = 4) => ({
@@ -167,10 +172,14 @@ test('real server migrates history and serves bounded history/account endpoints'
   await fs.mkdir(path.join(root, 'data'));
   const jsonl = JSON.stringify(row(now, { genshin: progress('A') })) + '\n{"at":';
   await fs.writeFile(path.join(root, 'data/snapshots.jsonl'), jsonl);
-  const child = spawn(process.execPath, [fileURLToPath(new URL('./server.mjs', import.meta.url))], {
-    env: { ...process.env, PORT: '0', TRACKER_DATA_DIR: root },
-    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
-  });
+  const child = spawn(
+    process.execPath,
+    [fileURLToPath(new URL('../tracker/server.mjs', import.meta.url))],
+    {
+      env: { ...process.env, PORT: '0', TRACKER_DATA_DIR: root },
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+    },
+  );
   t.after(async () => {
     if (child.exitCode === null) {
       child.kill();
@@ -203,7 +212,7 @@ test('real server migrates history and serves bounded history/account endpoints'
 
 test('weekly keys use local Mondays in positive and negative offsets, DST and year boundaries', () => {
   for (const timezone of ['Asia/Tokyo', 'Pacific/Auckland', 'America/Anchorage', 'UTC']) {
-    const script = `import { weekKey } from ${JSON.stringify(new URL('./history-dates.mjs', import.meta.url).href)}; console.log(JSON.stringify(['2026-10-12T00:00:00','2026-10-18T23:59:59','2027-01-01T12:00:00','2026-03-08T12:00:00'].map(value=>weekKey(new Date(value)))));`;
+    const script = `import { weekKey } from ${JSON.stringify(new URL('../tracker/history-dates.mjs', import.meta.url).href)}; console.log(JSON.stringify(['2026-10-12T00:00:00','2026-10-18T23:59:59','2027-01-01T12:00:00','2026-03-08T12:00:00'].map(value=>weekKey(new Date(value)))));`;
     const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
       env: { ...process.env, TZ: timezone },
       encoding: 'utf8',

@@ -1,3 +1,4 @@
+# This lockfile pins the exact dependency versions for reproducible installs.
 lockfileVersion: '9.0'
 
 settings:

@@ -45,7 +45,7 @@ else {
         minWidth: 380,
         minHeight: 600,
         title: 'Chinaslop Tracker',
-        icon: path.join(tracker, 'logo.png'),
+        icon: path.join(tracker, 'assets', 'logo.png'),
         autoHideMenuBar: true,
         webPreferences: {
           nodeIntegration: false,

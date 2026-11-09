@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createEventImageLoader } from './event-images.mjs';
+import { createEventImageLoader } from '../tracker/event-images.mjs';
 test('image loader only fetches official HTTPS raster images and never forwards credentials', async () => {
   let calls = 0;
   const load = createEventImageLoader({

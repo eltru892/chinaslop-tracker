@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAutoCheckInScheduler } from './auto-check-in.mjs';
+import { createAutoCheckInScheduler } from '../tracker/auto-check-in.mjs';
 function fixture(run = async () => ({ games: {} })) {
   const timers = new Map();
   let id = 0,

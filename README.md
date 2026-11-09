@@ -1,3 +1,5 @@
+<!-- Project overview and setup notes for the Chinaslop Tracker application. -->
+
 # Chinaslop Tracker
 
 A local tracker for **Genshin Impact**, **Honkai: Star Rail**, **Zenless Zone Zero**, and **Arknights: Endfield**.
@@ -41,6 +43,8 @@ GitHub Pages cannot run this local Node.js server. Use the downloads or run the 
 
 ## Tests
 
+Automated checks live in the top-level `tests/` folder; `tracker/` contains the application. These checks verify API response handling, account history, timers, encryption, and server behavior using fake credentials and temporary storage. They do not use your saved accounts.
+
 For consistent formatting, install pnpm 11.25.0 and run these commands from the repository root:
 
 ```sh
@@ -55,14 +59,14 @@ Prettier formats the JavaScript, HTML, CSS, JSON, YAML, and Markdown source. Rus
 From the repository root:
 
 ```sh
-node --test tracker/*.test.mjs
+node --test tests/*.test.mjs
 ```
 
 The tests use fake credentials and mocked service responses. GitHub Actions runs them on pushes and pull requests.
 
 ## Build Windows and Android
 
-New builds use **Tauri 2**. See [the native build guide](native/README.md) for Windows installers and standalone Android APKs. The shared Node backend and web UI remain in `tracker/`.
+New builds use **Tauri 2**. See [the Tauri build guide](tauri/README.md) for Windows installers and standalone Android APKs. The shared Node backend and web UI remain in `tracker/`.
 
 The published v1.0.0 downloads above are the previous Electron/Android builds. Rebuilding source does not replace those release assets automatically. Android updates require the original signing key.
 
@@ -70,11 +74,29 @@ The published v1.0.0 downloads above are the previous Electron/Android builds. R
 
 | Folder    | Purpose                                                      |
 | --------- | ------------------------------------------------------------ |
-| `tracker` | Shared web UI, server, connectors, assets and tests          |
-| `native`  | Tauri Windows and Android applications                       |
+| `tracker` | App entry point, UI modules, server, connectors and assets   |
+| `tauri`   | Tauri Windows and Android applications                       |
 | `desktop` | Legacy Electron wrapper and original icon assets             |
 | `android` | Embedded Node/JNI bridge, runtime notices and legacy wrapper |
+| `tests`   | Automated checks using fake accounts and temporary storage   |
 | `scripts` | Clean asset preparation and runtime download                 |
+
+## Browser code layout
+
+`tracker/app.js` starts the page and coordinates navigation and refreshes. Each feature initializes its own state and event handlers:
+
+| File                          | Responsibility                                                     |
+| ----------------------------- | ------------------------------------------------------------------ |
+| `tracker/ui/dashboard.js`     | Progress cards, resource recovery and reset timers                 |
+| `tracker/ui/events.js`        | Event timeline, game/server selectors and event details            |
+| `tracker/ui/history.js`       | Account selectors and daily/weekly history pagination              |
+| `tracker/ui/settings.js`      | Account settings, unlock and password forms                        |
+| `tracker/ui/check-in.js`      | Check-in button and result dialog                                  |
+| `tracker/ui/appearance.js`    | Background selection, browser storage, palettes and canvas drawing |
+| `tracker/ui/shared.js`        | DOM helpers, request handling, game labels and shared formatting   |
+| `tracker/data/backgrounds.js` | Public artwork catalog and palette presets                         |
+
+Browser modules use explicit imports; no framework or bundler is required. The server lists public module paths explicitly. Packaging copies the UI modules and the artwork catalog, without copying private history from `tracker/data/`. Automated tests remain in the top-level `tests/` folder.
 
 ## Privacy and sources
 

@@ -6,7 +6,7 @@ import {
   endfieldPageArtwork,
   matchPageArtwork,
   createOfficialArtwork,
-} from './official-art.mjs';
+} from '../tracker/official-art.mjs';
 const host = 'https://act-webstatic.hoyoverse.com/';
 const slide = {
   children: [

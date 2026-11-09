@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createCheckInService } from './check-in.mjs';
-import { skportSignature } from './collector.mjs';
+import { createCheckInService } from '../tracker/check-in.mjs';
+import { skportSignature } from '../tracker/collector.mjs';
 const config = {
   hoyolabCookie: 'ltuid_v2=fake; ltoken_v2=fake',
   skportToken: 'fake-account-token',

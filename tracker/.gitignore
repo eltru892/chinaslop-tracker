@@ -1,3 +1,4 @@
 config.local.json
 secrets.enc.json
-data/
+data/*
+!data/backgrounds.js
