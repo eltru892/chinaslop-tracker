@@ -12,7 +12,7 @@ Connect your own HoYoLAB and SKPORT accounts to refresh progress automatically. 
 | Native Windows app | [`windows/`](windows/) | Rust + egui implementation; Windows build and runtime validation pending |
 | Older Android app  | [`android/`](android/) | Legacy Android wrapper with an embedded Node.js runtime                  |
 
-The Rust app has its own interface and storage. It does not automatically import the browser tracker's accounts or history. The planned Kotlin Android app is not implemented yet. The old Electron desktop source has been removed; `windows/` is the maintained native desktop implementation.
+The Rust app has its own interface and storage. It does not automatically import the browser tracker's accounts or history.
 
 [Published releases](https://github.com/eltru892/chinaslop-tracker/releases) contain earlier builds. They are not automatically updated when source code changes.
 
