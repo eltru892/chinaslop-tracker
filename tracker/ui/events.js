@@ -86,7 +86,7 @@ export function initEvents({ enabled }) {
       } else image.remove();
     });
     // Use the local image proxy first, then try the original URL if loading fails.
-    image.src = '/api/event-image?url=' + encodeURIComponent(url);
+    image.src = '/api/event-image?thumbnail=1&url=' + encodeURIComponent(url);
   }
   let timelineResizeFrame = 0;
   if (enabled)
@@ -162,6 +162,7 @@ export function initEvents({ enabled }) {
       eventWindowOffset = 0;
       writeStoredValue('tracker-event-game', eventGame);
       renderEvents();
+      void loadEvents();
     });
     gameLabel.append(gameSelect);
     toolbar.append(gameLabel);
@@ -458,6 +459,8 @@ export function initEvents({ enabled }) {
           (game) => [game, eventServers[game]],
         ),
       );
+      query.set('game', eventGame);
+      query.set('artwork', '0');
       const response = await fetch('/api/events?' + query);
       if (response.status === 404)
         throw new Error('Restart the tracker server to load event calendars.');
@@ -470,6 +473,21 @@ export function initEvents({ enabled }) {
       eventClockOffset = Number.isFinite(data.serverTime) ? data.serverTime - Date.now() : 0;
       getElement('eventsMessage').textContent = '';
       renderEvents();
+      // Paint the schedule immediately, then fill missing official artwork in the background.
+      query.set('artwork', '1');
+      void fetch('/api/events?' + query)
+        .then((response) => {
+          if (!response.ok) throw new Error('Artwork unavailable');
+          return response.json();
+        })
+        .then((enriched) => {
+          if (sequence !== eventLoadSequence || !enriched.games) return;
+          eventCalendars = enriched;
+          renderEvents();
+        })
+        .catch(() => {
+          /* Keep the already displayed schedule if artwork lookup fails. */
+        });
     } catch (error) {
       if (sequence !== eventLoadSequence) return;
       getElement('eventsMessage').textContent = error.message;

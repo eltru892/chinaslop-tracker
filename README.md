@@ -4,7 +4,7 @@
 
 A local tracker for **Genshin Impact**, **Honkai: Star Rail**, **Zenless Zone Zero**, and **Arknights: Endfield**.
 
-## Download
+## Published legacy downloads
 
 - [Windows portable EXE](https://github.com/eltru892/chinaslop-tracker/releases/download/v1.0.0/Chinaslop-Tracker-Windows-1.0.0.exe)
 - [Standalone Android APK](https://github.com/eltru892/chinaslop-tracker/releases/download/v1.0.0/Chinaslop-Tracker-Android-1.0.0.apk)
@@ -24,13 +24,17 @@ Set an encryption password and connect your own accounts on first launch. Downlo
 - Daily and weekly SQLite history with server pagination, per-game account selectors, and a mobile layout.
 - Manual HoYoLAB and SKPORT daily check-in, plus an optional automatic check-in setting.
 - Background images, matching color palettes and translucent game cards.
+- Saved account profiles with encrypted connections and a selector above Daily progress. Names come from the Genshin or Endfield nickname after syncing (with HSR or ZZZ as a fallback). Automatic refresh and check-in use the selected profile; historical records remain available after switching or deleting a profile.
 - Local account storage encrypted with scrypt and AES-256-GCM.
+- Automatic unlocking after the first password entry on macOS (Keychain) and Windows (user-scoped DPAPI). If protected device storage is unavailable, enter the password manually; Android/Linux currently use this fallback. Keep the password for recovery or moving to another computer.
 
 Automatic check-in requires the server to remain running and unlocked. Android can suspend or terminate background apps; reopen and unlock to resume. Expired sessions or CAPTCHA challenges require attention. Check-in claims web rewards, not in-game commissions.
 
 ## Run the browser version
 
-Install Node.js 24 or newer, then:
+Install Node.js 24 or newer. On macOS, double-click **Start Tracker.command** in the project folder; it starts the server and opens your browser. On Windows, double-click **launch.bat**, then open the local address printed in the terminal. Keep the terminal window open; press Control+C to stop.
+
+To start manually:
 
 ```sh
 cd tracker
@@ -44,6 +48,15 @@ GitHub Pages cannot run this local Node.js server. Use the downloads or run the 
 ## Tests
 
 Automated checks live in the top-level `tests/` folder; `tracker/` contains the application. These checks verify API response handling, account history, timers, encryption, and server behavior using fake credentials and temporary storage. They do not use your saved accounts.
+
+Tests are grouped by their main responsibility:
+
+- `tests/data/`: history storage, saved settings, encryption, and time calculations.
+- `tests/services/`: provider requests, check-in scheduling, device unlock, and artwork services.
+- `tests/integration/`: server endpoints, account switching, and serving the browser modules.
+- `tests/ui/`: browser rendering, account controls, and refresh-status behavior.
+
+Some feature suites also check their server integration. `npm test` discovers test files recursively, including new subfolders.
 
 For consistent formatting, install pnpm 11.25.0 and run these commands from the repository root:
 
@@ -59,27 +72,29 @@ Prettier formats the JavaScript, HTML, CSS, JSON, YAML, and Markdown source. Rus
 From the repository root:
 
 ```sh
-node --test tests/*.test.mjs
+npm test
 ```
 
 The tests use fake credentials and mocked service responses. GitHub Actions runs them on pushes and pull requests.
 
 ## Build Windows and Android
 
-New builds use **Tauri 2**. See [the Tauri build guide](tauri/README.md) for Windows installers and standalone Android APKs. The shared Node backend and web UI remain in `tracker/`.
+The native Windows app is written in Rust with egui and lives in `windows/`. See [the native build guide](windows/README.md). On Windows, install Rust and Visual Studio C++ Build Tools, then run `windows/Build Windows.cmd`. It produces a portable executable and assets in `windows/artifacts/windows/`. Windows runtime validation is still pending.
+
+The browser tracker remains in `tracker/`. The `android/` and `desktop/` folders contain the earlier Android and Electron wrappers; `scripts/prepare.py` prepares their generated tracker assets. The planned Kotlin Android rewrite has not been built yet.
 
 The published v1.0.0 downloads above are the previous Electron/Android builds. Rebuilding source does not replace those release assets automatically. Android updates require the original signing key.
 
 ## Project layout
 
-| Folder    | Purpose                                                      |
-| --------- | ------------------------------------------------------------ |
-| `tracker` | App entry point, UI modules, server, connectors and assets   |
-| `tauri`   | Tauri Windows and Android applications                       |
-| `desktop` | Legacy Electron wrapper and original icon assets             |
-| `android` | Embedded Node/JNI bridge, runtime notices and legacy wrapper |
-| `tests`   | Automated checks using fake accounts and temporary storage   |
-| `scripts` | Clean asset preparation and runtime download                 |
+| Folder    | Purpose                                                             |
+| --------- | ------------------------------------------------------------------- |
+| `tracker` | App entry point, UI modules, server, connectors and assets          |
+| `windows` | Native Rust desktop app, tests, artwork, and Windows build launcher |
+| `desktop` | Legacy Electron wrapper and original icon assets                    |
+| `android` | Embedded Node/JNI bridge, runtime notices and legacy wrapper        |
+| `tests`   | Automated checks using fake accounts and temporary storage          |
+| `scripts` | Clean asset preparation and runtime download                        |
 
 ## Browser code layout
 
@@ -102,7 +117,7 @@ Browser modules use explicit imports; no framework or bundler is required. The s
 
 Game requests go from the local server to HoYoLAB and SKPORT. Event details and images also use official game sites and image hosts. These service APIs can change and are not a stable public developer API contract.
 
-Never commit cookies, tokens, account history, encryption passwords or signing keys. Local servers bind to loopback. Native apps add a random local session key. Account credentials remain encrypted at rest; the unlock password is held in memory while the server runs. Uninstalling the Android app removes its local storage.
+Never commit cookies, tokens, account history, encryption passwords or signing keys. Local servers bind to loopback. The legacy web wrappers add a random local session key. The Rust app makes requests directly and uses its own encrypted storage, with its encryption key in the OS credential store. Account credentials remain encrypted at rest; the unlock password is held in memory while the server runs. Uninstalling the Android app removes its local storage.
 
 See [ATTRIBUTION.md](ATTRIBUTION.md) for artwork and runtime credits. This is an unofficial project and is not affiliated with the game publishers. No repository-wide open-source license has been selected; publishing the source does not grant rights to third-party game artwork.
 

@@ -142,10 +142,11 @@ async function endfield(config, claim, fetchJSON) {
   );
 }
 export function createCheckInService(fetchJSON = request) {
-  let active = null;
+  const active = new Map();
   return (config, claim = false) => {
     // Share an in-flight claim across tabs to prevent duplicate submissions.
-    if (active) return active;
+    const key = JSON.stringify([config.hoyolabCookie || '', config.skportToken || '']);
+    if (active.has(key)) return active.get(key);
     const run = async () => {
       const entries = await Promise.all(
         checkInGames.map(async (game) => {
@@ -171,9 +172,10 @@ export function createCheckInService(fetchJSON = request) {
       return { at: new Date().toISOString(), games: Object.fromEntries(entries) };
     };
     if (!claim) return run();
-    active = run().finally(() => {
-      active = null;
+    const pending = run().finally(() => {
+      active.delete(key);
     });
-    return active;
+    active.set(key, pending);
+    return pending;
   };
 }

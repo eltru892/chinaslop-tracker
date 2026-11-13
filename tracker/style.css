@@ -2194,7 +2194,8 @@ body {
   min-width: 0;
   font-weight: 600;
 }
-.historyAccountPicker select {
+.historyAccountPicker select,
+.accountProfileControl select {
   width: 100%;
   min-width: 0;
   text-overflow: ellipsis;
@@ -2216,5 +2217,90 @@ body {
 @media (max-width: 700px) {
   .historyAccounts {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The dashboard account picker wraps its actions on narrow screens. */
+.accountProfileControl {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+.accountProfileControl label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-soft);
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.accountProfileControl select {
+  width: 20rem;
+  max-width: 100%;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.accountProfileControl select:hover,
+.accountProfileControl select:focus {
+  border-color: var(--primary);
+}
+.accountProfileControl select:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.accountProfileControl p {
+  flex-basis: 100%;
+  margin: 0;
+}
+.accountProfileControl p:empty {
+  display: none;
+}
+@media (max-width: 700px) {
+  .accountProfileControl label {
+    width: 100%;
+  }
+  .accountProfileControl select {
+    width: 100%;
+  }
+}
+
+#settings .settingsAccountControls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+#settings .settingsAccountName {
+  width: min(100%, 15rem);
+  cursor: pointer;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text);
+}
+#settings .settingsAccountControls p {
+  flex-basis: 100%;
+  margin: 0;
+}
+#settings .settingsAccountControls p:empty {
+  display: none;
+}
+
+.refreshStatus {
+  margin: 9px 0 0;
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: right;
+  max-width: 32rem;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .refreshStatus {
+    text-align: left;
   }
 }

@@ -6,6 +6,7 @@ import { initHistory } from './ui/history.js';
 import { initSettings } from './ui/settings.js';
 import { initCheckIn } from './ui/check-in.js';
 import { initAppearance } from './ui/appearance.js';
+import { initRefreshStatus } from './ui/refresh-status.js';
 
 // All pages share index.html; the URL decides which section is visible.
 const pageSearch = new URLSearchParams(window.location.search);
@@ -52,6 +53,7 @@ const history = initHistory({ enabled: isHistoryPage });
 const settings = initSettings({ reload: loadState, refresh: refreshData });
 const checkIn = initCheckIn({ isLocked: () => !!refreshSchedule?.locked });
 const appearance = initAppearance();
+const refreshStatus = initRefreshStatus();
 getElement('sync').addEventListener('click', refreshData);
 
 // Keep refresh and check-in controls consistent with the server lock and sync state.
@@ -62,12 +64,13 @@ function setRefreshState(syncing, locked = false) {
   getElement('sync').title = locked
     ? 'Unlock storage to refresh game data'
     : 'Fetch the latest progress';
-  getElement('syncLabel').textContent = syncing ? 'Refreshing…' : 'Refresh now';
+  getElement('syncLabel').textContent = syncing ? 'Refreshing…' : 'Refresh';
 }
 let syncPoll = null;
 let refreshSchedule = null;
 let scheduleReloadPending = false;
 let lastDashboardSnapshot = null;
+let stateRequestSequence = 0;
 function renderRefreshCountdown() {
   const node = getElement('nextRefresh');
   if (!refreshSchedule) {
@@ -100,10 +103,14 @@ function renderRefreshCountdown() {
 }
 // Read the local server state and pass each feature only the updates it needs.
 async function loadState() {
+  const sequence = ++stateRequestSequence;
   clearTimeout(syncPoll);
   syncPoll = null;
   try {
     const state = await requestJson('/api/state');
+    if (sequence !== stateRequestSequence) return;
+    refreshStatus.update(state);
+    checkIn.setProfile(state.profiles?.activeId || null);
     refreshSchedule = {
       nextRefreshAt: state.nextRefreshAt,
       locked: !!state.security?.locked,
@@ -115,7 +122,8 @@ async function loadState() {
       : 'No sync yet';
     renderRefreshCountdown();
     // Poll more often only while a sync is running so completion appears promptly.
-    if (state.syncing) syncPoll = setTimeout(loadState, 1000);
+    if (state.syncing || state.security?.automaticUnlock?.pending)
+      syncPoll = setTimeout(loadState, 1000);
     // Rebuild visible cards only when their snapshot changes; timers update separately.
     if (!isHistoryPage && !isEventsPage) {
       const snapshot = JSON.stringify(state.latest);
@@ -137,6 +145,7 @@ async function loadState() {
 }
 async function refreshData() {
   setRefreshState(true);
+  refreshStatus.begin();
   // Reset the countdown immediately; restore the old deadline if the request fails.
   const previousDeadline = refreshSchedule?.nextRefreshAt;
   if (refreshSchedule?.nextRefreshAt && !refreshSchedule.locked) {
@@ -152,6 +161,9 @@ async function refreshData() {
     renderRefreshCountdown();
     setRefreshState(false);
     showNotice(error.message);
+    refreshStatus.fail();
+  } finally {
+    refreshStatus.end();
   }
 }
 

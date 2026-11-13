@@ -16,5 +16,5 @@ jobs:
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: pnpm format:check
       - run: rustup component add rustfmt
-      - run: cargo fmt --manifest-path tauri/src-tauri/Cargo.toml --check
-      - run: node --test tests/*.test.mjs
+      - run: cargo fmt --manifest-path windows/Cargo.toml --check
+      - run: pnpm test

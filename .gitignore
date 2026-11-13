@@ -3,6 +3,7 @@
 # Personal account data and local settings
 **/config.local.json
 **/secrets.enc.json
+**/device-unlock.dpapi*
 **/data/
 .env
 .env.*
@@ -31,10 +32,8 @@ android/local.properties
 *.idsig
 .DS_Store
 
-# Tauri generated resources and compiler output
-tauri/src-tauri/target/
-tauri/src-tauri/gen/
-tauri/src-tauri/resources/
+# Native Rust compiler output
+windows/target/
 __pycache__/
 artifacts/
 
@@ -48,3 +47,8 @@ artifacts/
 !tracker/data/
 tracker/data/*
 !tracker/data/backgrounds.js
+
+# Data-focused tests are source code, not personal account storage.
+!tests/data/
+tests/data/*
+!tests/data/*.test.mjs

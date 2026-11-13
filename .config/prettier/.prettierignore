@@ -6,3 +6,7 @@
 **/Cargo.lock
 **/*LICENSE*
 ../../tracker/assets/
+
+# Native artwork and compiler output are not editable source.
+**/target/**
+**/assets/**

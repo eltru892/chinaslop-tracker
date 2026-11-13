@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { randomUUID } from 'node:crypto';
 import { openHistoryStore, mergeSnapshot, HISTORY_GAMES } from './history.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -11,8 +12,9 @@ import { createEventService } from './events.mjs';
 import { createEventImageLoader } from './event-images.mjs';
 const loadEventImage = createEventImageLoader();
 const getEventCalendars = createEventService();
-import { encryptSecrets, decryptSecrets, writeEncryptedFile } from './secrets.mjs';
+import { encryptSecrets, decryptSecrets, writeEncryptedFile, accountProfiles } from './secrets.mjs';
 import { cookieAccountId, updateHoyoSettings } from './hoyolab-settings.mjs';
+import { createDeviceUnlock } from './device-unlock.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const storageRoot = process.env.TRACKER_DATA_DIR
@@ -22,9 +24,74 @@ await fs.mkdir(storageRoot, { recursive: true });
 const configPath = path.join(storageRoot, 'config.local.json');
 const secretsPath = path.join(storageRoot, 'secrets.enc.json');
 const historyStore = await openHistoryStore(path.join(storageRoot, 'data'));
+const deviceUnlock = createDeviceUnlock(storageRoot);
+const automaticUnlock = {
+  supported: deviceUnlock.supported,
+  provider: deviceUnlock.provider,
+  remembered: false,
+  pending: false,
+  error: null,
+};
+async function rememberPassword(password) {
+  if (!deviceUnlock.supported) return;
+  try {
+    await deviceUnlock.write(password);
+    automaticUnlock.remembered = true;
+    automaticUnlock.error = null;
+  } catch {
+    automaticUnlock.remembered = false;
+    automaticUnlock.error =
+      'Could not remember this device. Your accounts are still encrypted; enter your password next time.';
+  }
+}
+async function restoreDeviceUnlock() {
+  if (!encryptedEnvelope || !deviceUnlock.supported) return;
+  automaticUnlock.pending = true;
+  const release = await acquireMutation();
+  try {
+    if (unlockedSecrets) return;
+    const password = await deviceUnlock.read();
+    if (password) {
+      await unlock(password);
+      automaticUnlock.remembered = true;
+    }
+  } catch {
+    automaticUnlock.error =
+      'Automatic unlock was unavailable. Enter your password to unlock and remember this device again.';
+  } finally {
+    automaticUnlock.pending = false;
+    release();
+  }
+}
+
 let credentialRevision = 0;
 const port = Number(process.env.PORT || 4317);
 const host = '127.0.0.1';
+const TRACKER_GAMES = Object.freeze(['genshin', 'hsr', 'zzz', 'endfield']);
+const MUTATION_ROUTES = new Set(['/api/unlock', '/api/password', '/api/settings', '/api/profiles']);
+const STATIC_FILES = Object.freeze({
+  '/': 'index.html',
+  '/index.html': 'index.html',
+  '/app.js': 'app.js',
+  '/ui/shared.js': 'ui/shared.js',
+  '/ui/dashboard.js': 'ui/dashboard.js',
+  '/ui/events.js': 'ui/events.js',
+  '/ui/history.js': 'ui/history.js',
+  '/ui/settings.js': 'ui/settings.js',
+  '/ui/refresh-status.js': 'ui/refresh-status.js',
+  '/ui/check-in.js': 'ui/check-in.js',
+  '/ui/appearance.js': 'ui/appearance.js',
+  '/data/backgrounds.js': 'data/backgrounds.js',
+  '/resource-time.mjs': 'resource-time.mjs',
+  '/history-dates.mjs': 'history-dates.mjs',
+  '/style.css': 'style.css',
+  '/logo.png': 'assets/logo.png',
+  '/assets/logo.png': 'assets/logo.png',
+  '/assets/genshin-logo.png': 'assets/genshin-logo.png',
+  '/assets/hsr-logo.png': 'assets/hsr-logo.png',
+  '/assets/zzz-logo.png': 'assets/zzz-logo.png',
+  '/assets/endfield-logo.png': 'assets/endfield-logo.png',
+});
 const accessKey = process.env.TRACKER_ACCESS_KEY || '';
 function hasLocalAccess(req) {
   if (!accessKey) return true;
@@ -43,6 +110,8 @@ function refreshMinutes(value) {
 let latest = null;
 let syncing = false;
 let lastError = null;
+let refreshTiming = null;
+let refreshProgress = null;
 let timer = null;
 let nextRefreshAt = null;
 let encryptedEnvelope = null;
@@ -117,18 +186,85 @@ async function unlock(passphrase) {
     encryptedEnvelope = envelope;
     unlockedSecrets = values;
   }
+  // Upgrade single-account storage once, without losing existing credentials.
+  if (!unlockedSecrets.profiles) {
+    const vault = accountProfiles(unlockedSecrets);
+    const envelope = encryptSecrets(vault, passphrase);
+    await writeEncryptedFile(secretsPath, envelope);
+    encryptedEnvelope = envelope;
+    unlockedSecrets = vault;
+  }
   unlockPassword = passphrase;
   await schedule();
   await scheduleAutoCheckIn();
   if (unlockedSecrets.hoyolabCookie || unlockedSecrets.skportToken) sync();
 }
+function activateCredentials(next) {
+  const hoyoChanged =
+    next.hoyolabCookie !== unlockedSecrets.hoyolabCookie ||
+    next.hoyolabUid !== unlockedSecrets.hoyolabUid;
+  const skportChanged = next.skportToken !== unlockedSecrets.skportToken;
+  const changedGames = [
+    ...(hoyoChanged ? ['genshin', 'hsr', 'zzz'] : []),
+    ...(skportChanged ? ['endfield'] : []),
+  ];
+  if (changedGames.length) {
+    refreshTiming = null;
+    refreshProgress = null;
+    credentialRevision++;
+    for (const game of changedGames)
+      historyStore.clearCurrent(
+        [game],
+        (game === 'endfield' ? next.skportToken : next.hoyolabCookie)
+          ? 'Loading connected account…'
+          : `Connect ${game === 'endfield' ? 'SKPORT' : 'HoYoLAB'} in Settings`,
+      );
+    latest = historyStore.latest();
+  }
+  unlockedSecrets = next;
+
+  if (changedGames.length) autoCheckIn.reset();
+  return changedGames.length > 0;
+}
+// Serialize the entire mutation, including reads and in-memory updates, across tabs.
+let mutationQueue = Promise.resolve();
+async function acquireMutation() {
+  const previous = mutationQueue;
+  let release;
+  mutationQueue = new Promise((resolve) => {
+    release = resolve;
+  });
+  await previous;
+  return release;
+}
 async function sync() {
   if (syncing || !unlockedSecrets) return;
   syncing = true;
+  refreshProgress = { phase: 'starting', active: [] };
+  const activeRequests = new Set();
+  let partial = false;
+  let failed = false;
   const revision = credentialRevision;
   const credentials = { ...unlockedSecrets };
+  const started = performance.now();
+  const requests = [];
+  let fetchMs = null;
+  let releaseMutation;
   try {
-    const incoming = await collect({ ...(await readConfig()), ...credentials });
+    const incoming = await collect(
+      { ...(await readConfig()), ...credentials },
+      {
+        onTiming: (entry) => requests.push(entry),
+        onProgress: ({ request, running }) => {
+          if (revision !== credentialRevision) return;
+          if (running) activeRequests.add(request);
+          else activeRequests.delete(request);
+          refreshProgress = { phase: 'fetching', active: [...activeRequests] };
+        },
+      },
+    );
+    fetchMs = Math.round(performance.now() - started);
+    releaseMutation = await acquireMutation();
     // A response started before a connection change must never restore the previous account.
     if (revision !== credentialRevision) return;
     for (const game of HISTORY_GAMES) {
@@ -139,13 +275,48 @@ async function sync() {
         };
       }
     }
+    refreshProgress = { phase: 'saving', active: [] };
+    partial = Object.values(incoming.games).some((game) => game.error && !game.disconnected);
     const snapshot = mergeSnapshot(latest, incoming);
     historyStore.record(snapshot);
     latest = snapshot;
     lastError = null;
+    // Use a successful live identity, never a stale snapshot from another account.
+    const nickname = ['genshin', 'endfield', 'hsr', 'zzz']
+      .map((game) => incoming.games[game])
+      .filter((game) => game && !game.error && !game.stale)
+      .map((game) => String(game.identity?.nickname || '').trim())
+      .find(Boolean)
+      ?.slice(0, 60);
+    const active = unlockedSecrets.profiles.find(
+      (profile) => profile.id === unlockedSecrets.activeProfileId,
+    );
+    if (nickname && active.name !== nickname) {
+      const next = {
+        ...unlockedSecrets,
+        profiles: unlockedSecrets.profiles.map((profile) =>
+          profile.id === active.id ? { ...profile, name: nickname } : profile,
+        ),
+      };
+      const envelope = encryptSecrets(next, unlockPassword);
+      await writeEncryptedFile(secretsPath, envelope);
+      encryptedEnvelope = envelope;
+      unlockedSecrets = next;
+    }
   } catch (error) {
+    failed = true;
     lastError = error.message;
   } finally {
+    if (revision === credentialRevision) {
+      refreshTiming = {
+        at: new Date().toISOString(),
+        totalMs: Math.round(performance.now() - started),
+        fetchMs,
+        requests,
+      };
+      refreshProgress = { phase: failed ? 'failed' : partial ? 'partial' : 'complete', active: [] };
+    }
+    releaseMutation?.();
     syncing = false;
     if (revision !== credentialRevision) void sync();
   }
@@ -190,7 +361,16 @@ function allowedOrigin(req) {
   const origin = req.headers.origin;
   return !origin || origin === `http://${host}:${listeningPort}`;
 }
+function resolveStaticAssetType(name) {
+  if (name.endsWith('.webp')) return 'image/webp';
+  if (name.endsWith('.png')) return 'image/png';
+  if (name.endsWith('.svg')) return 'image/svg+xml';
+  if (/\.m?js$/.test(name)) return 'text/javascript; charset=utf-8';
+  if (name.endsWith('.css')) return 'text/css; charset=utf-8';
+  return 'text/html; charset=utf-8';
+}
 const server = http.createServer(async (req, res) => {
+  let releaseMutation;
   try {
     if (!hasLocalAccess(req))
       return send(res, 403, { error: 'Open the tracker from its app window' });
@@ -198,8 +378,12 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/health' && req.method === 'GET') return send(res, 200, { ok: true });
     if (req.method === 'POST' && !allowedOrigin(req))
       return send(res, 403, { error: 'Origin denied' });
+    if (req.method === 'POST' && MUTATION_ROUTES.has(url.pathname))
+      releaseMutation = await acquireMutation();
     if (url.pathname === '/api/event-image' && req.method === 'GET') {
-      const image = await loadEventImage(url.searchParams.get('url') || '');
+      const image = await loadEventImage(url.searchParams.get('url') || '', {
+        thumbnail: url.searchParams.get('thumbnail') === '1',
+      });
       return send(res, 200, image.bytes, image.type, { 'Cache-Control': 'private, max-age=3600' });
     }
     if (url.pathname === '/api/events' && req.method === 'GET')
@@ -209,24 +393,29 @@ const server = http.createServer(async (req, res) => {
         await getEventCalendars(
           unlockedSecrets || {},
           latest,
-          Object.fromEntries(
-            ['genshin', 'hsr', 'zzz', 'endfield'].map((game) => [
-              game,
-              url.searchParams.get(game) || '',
-            ]),
-          ),
+          Object.fromEntries(TRACKER_GAMES.map((game) => [game, url.searchParams.get(game) || ''])),
+          { game: url.searchParams.get('game'), artwork: url.searchParams.get('artwork') !== '0' },
         ),
       );
     if (url.pathname === '/api/check-in' && ['GET', 'POST'].includes(req.method)) {
       if (!unlockedSecrets) return send(res, 423, { error: 'Unlock encrypted storage first' });
+      if (
+        req.headers['x-tracker-profile'] &&
+        req.headers['x-tracker-profile'] !== unlockedSecrets.activeProfileId
+      )
+        return send(res, 409, { error: 'The active account changed. Reload before checking in.' });
       return send(res, 200, await checkIn({ ...unlockedSecrets }, req.method === 'POST'));
     }
+    if (url.pathname === '/api/refresh-status' && req.method === 'GET')
+      return send(res, 200, { syncing, refreshProgress });
     if (url.pathname === '/api/state' && req.method === 'GET') {
       const config = await readConfig();
       return send(res, 200, {
         latest,
         syncing,
         lastError,
+        refreshTiming,
+        refreshProgress,
         nextRefreshAt,
         serverTime: Date.now(),
         autoCheckIn: { enabled: config.autoCheckIn === true, ...autoCheckIn.state() },
@@ -242,7 +431,14 @@ const server = http.createServer(async (req, res) => {
             : !!(encryptedEnvelope?.hasHoyo || config.hoyolabUid),
           pollMinutes: refreshMinutes(config.pollMinutes),
         },
+        profiles: unlockedSecrets?.profiles
+          ? {
+              activeId: unlockedSecrets.activeProfileId,
+              items: unlockedSecrets.profiles.map(({ id, name }) => ({ id, name })),
+            }
+          : null,
         security: {
+          automaticUnlock: { ...automaticUnlock },
           encrypted: !!encryptedEnvelope,
           locked: !unlockedSecrets,
           legacyUnencrypted: !!(config.hoyolabCookie || config.skportToken),
@@ -284,6 +480,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/unlock' && req.method === 'POST') {
       const input = await bodyJson(req);
       await unlock(input.passphrase);
+      await rememberPassword(input.passphrase);
       return send(res, 200, { ok: true });
     }
     if (url.pathname === '/api/password' && req.method === 'POST') {
@@ -305,6 +502,46 @@ const server = http.createServer(async (req, res) => {
       await writeEncryptedFile(secretsPath, envelope);
       encryptedEnvelope = envelope;
       unlockPassword = input.newPassword;
+      await rememberPassword(input.newPassword);
+      return send(res, 200, { ok: true });
+    }
+    if (url.pathname === '/api/profiles' && req.method === 'POST') {
+      if (!unlockedSecrets) return send(res, 423, { error: 'Unlock encrypted storage first' });
+      const input = await bodyJson(req);
+      if (input.expectedActiveId !== unlockedSecrets.activeProfileId)
+        return send(res, 409, {
+          error: 'The active account changed in another window. Reload and try again.',
+        });
+      let profiles = unlockedSecrets.profiles.map((profile) => ({ ...profile }));
+      let activeProfileId = unlockedSecrets.activeProfileId;
+      if (input.action === 'create') {
+        let number = 1;
+        while (profiles.some((profile) => profile.name === `Account ${number}`)) number++;
+        activeProfileId = randomUUID();
+        profiles.push({
+          id: activeProfileId,
+          name: `Account ${number}`,
+          hoyolabCookie: '',
+          skportToken: '',
+        });
+      } else if (input.action === 'switch') {
+        if (!profiles.some((profile) => profile.id === input.id))
+          return send(res, 400, { error: 'Saved account not found.' });
+        activeProfileId = input.id;
+      } else if (input.action === 'delete') {
+        if (profiles.length === 1)
+          return send(res, 400, { error: 'Keep at least one account profile.' });
+        profiles = profiles.filter((profile) => profile.id !== activeProfileId);
+        activeProfileId = profiles[0].id;
+      } else return send(res, 400, { error: 'Unknown account action.' });
+      const next = accountProfiles({ profiles, activeProfileId });
+      const envelope = encryptSecrets(next, unlockPassword);
+      await writeEncryptedFile(secretsPath, envelope);
+      encryptedEnvelope = envelope;
+      activateCredentials(next);
+      await schedule();
+      await scheduleAutoCheckIn();
+      void sync();
       return send(res, 200, { ok: true });
     }
     if (url.pathname === '/api/settings' && req.method === 'POST') {
@@ -316,81 +553,43 @@ const server = http.createServer(async (req, res) => {
       if (input.autoCheckIn !== undefined && typeof input.autoCheckIn !== 'boolean')
         return send(res, 400, { error: 'Automatic check-in must be on or off' });
       const config = await readConfig();
+      if (input.profileId !== undefined && input.profileId !== unlockedSecrets.activeProfileId)
+        return send(res, 409, { error: 'The active account changed. Reload before saving.' });
       const updatedSecrets = updateHoyoSettings(unlockedSecrets, input);
       if (typeof input.skportToken === 'string' && input.skportToken.trim())
         updatedSecrets.skportToken = input.skportToken.trim();
       if (input.removeSkport === true) updatedSecrets.skportToken = '';
       if (input.autoCheckIn !== undefined) config.autoCheckIn = input.autoCheckIn;
       if (input.pollMinutes !== undefined) config.pollMinutes = refreshMinutes(input.pollMinutes);
+      updatedSecrets.profiles = unlockedSecrets.profiles.map((profile) =>
+        profile.id === updatedSecrets.activeProfileId
+          ? {
+              id: profile.id,
+              name: profile.name,
+              hoyolabCookie: updatedSecrets.hoyolabCookie,
+              skportToken: updatedSecrets.skportToken,
+              ...(updatedSecrets.hoyolabUid ? { hoyolabUid: updatedSecrets.hoyolabUid } : {}),
+            }
+          : profile,
+      );
       const envelope = encryptSecrets(updatedSecrets, unlockPassword);
       await writeEncryptedFile(secretsPath, envelope);
       encryptedEnvelope = envelope;
-      const hoyoChanged =
-        updatedSecrets.hoyolabCookie !== unlockedSecrets.hoyolabCookie ||
-        updatedSecrets.hoyolabUid !== unlockedSecrets.hoyolabUid;
-      const skportChanged = updatedSecrets.skportToken !== unlockedSecrets.skportToken;
-      const changedGames = [
-        ...(hoyoChanged ? ['genshin', 'hsr', 'zzz'] : []),
-        ...(skportChanged ? ['endfield'] : []),
-      ];
-      if (changedGames.length) {
-        credentialRevision++;
-        for (const game of changedGames)
-          historyStore.clearCurrent(
-            [game],
-            (game === 'endfield' ? updatedSecrets.skportToken : updatedSecrets.hoyolabCookie)
-              ? 'Loading connected account…'
-              : `Connect ${game === 'endfield' ? 'SKPORT' : 'HoYoLAB'} in Settings`,
-          );
-        latest = historyStore.latest();
-      }
-      unlockedSecrets = updatedSecrets;
+      const connectionsChanged = activateCredentials(updatedSecrets);
       await writeConfig(config);
       await schedule();
       await scheduleAutoCheckIn();
-      if (changedGames.length) void sync();
+      if (connectionsChanged) void sync();
       return send(res, 200, { ok: true });
     }
     if (req.method !== 'GET') return send(res, 405, { error: 'Method not allowed' });
-    const files = {
-      '/': 'index.html',
-      '/index.html': 'index.html',
-      '/app.js': 'app.js',
-      '/ui/shared.js': 'ui/shared.js',
-      '/ui/dashboard.js': 'ui/dashboard.js',
-      '/ui/events.js': 'ui/events.js',
-      '/ui/history.js': 'ui/history.js',
-      '/ui/settings.js': 'ui/settings.js',
-      '/ui/check-in.js': 'ui/check-in.js',
-      '/ui/appearance.js': 'ui/appearance.js',
-      '/data/backgrounds.js': 'data/backgrounds.js',
-      '/resource-time.mjs': 'resource-time.mjs',
-      '/history-dates.mjs': 'history-dates.mjs',
-      '/style.css': 'style.css',
-      '/logo.png': 'assets/logo.png',
-      '/assets/logo.png': 'assets/logo.png',
-      '/assets/genshin-logo.png': 'assets/genshin-logo.png',
-      '/assets/hsr-logo.png': 'assets/hsr-logo.png',
-      '/assets/zzz-logo.png': 'assets/zzz-logo.png',
-      '/assets/endfield-logo.png': 'assets/endfield-logo.png',
-    };
     const name =
-      files[url.pathname] ||
+      STATIC_FILES[url.pathname] ||
       (/^\/assets\/endfield-backgrounds\/\d+(?:-thumb)?\.webp$/.test(url.pathname)
         ? url.pathname.slice(1)
         : null);
     if (!name) return send(res, 404, { error: 'Not found' });
-    const type = name.endsWith('.webp')
-      ? 'image/webp'
-      : name.endsWith('.png')
-        ? 'image/png'
-        : name.endsWith('.svg')
-          ? 'image/svg+xml'
-          : /\.m?js$/.test(name)
-            ? 'text/javascript; charset=utf-8'
-            : name.endsWith('.css')
-              ? 'text/css; charset=utf-8'
-              : 'text/html; charset=utf-8';
+    const type = resolveStaticAssetType(name);
     return send(
       res,
       200,
@@ -399,6 +598,8 @@ const server = http.createServer(async (req, res) => {
     );
   } catch (error) {
     return send(res, 500, { error: error.message });
+  } finally {
+    releaseMutation?.();
   }
 });
 
@@ -417,6 +618,7 @@ if (disconnectedGames.length && latest) {
 await schedule();
 server.listen(port, host, async () => {
   listeningPort = server.address().port;
-  console.log(`Game Progress Tracker: http://${host}:${listeningPort}`);
+  console.log(`Chinaslop Tracker: http://${host}:${listeningPort}`);
   process.send?.({ type: 'ready', port: listeningPort });
+  void restoreDeviceUnlock();
 });

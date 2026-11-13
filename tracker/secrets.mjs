@@ -3,6 +3,39 @@ import fs from 'node:fs/promises';
 
 const SCRYPT = { N: 1 << 15, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
 
+// Keep every profile inside the encrypted payload; expose only names and IDs to the UI.
+function credentials(value) {
+  return {
+    hoyolabCookie: String(value.hoyolabCookie || ''),
+    skportToken: String(value.skportToken || ''),
+    ...(value.hoyolabUid ? { hoyolabUid: String(value.hoyolabUid) } : {}),
+  };
+}
+export function accountProfiles(secrets) {
+  if (!secrets.profiles) {
+    const profile = { id: crypto.randomUUID(), name: 'Main account', ...credentials(secrets) };
+    return { ...credentials(profile), activeProfileId: profile.id, profiles: [profile] };
+  }
+  if (!Array.isArray(secrets.profiles) || !secrets.profiles.length)
+    throw new Error('Invalid saved account profiles');
+  const profiles = secrets.profiles.map((profile) => {
+    if (
+      typeof profile.id !== 'string' ||
+      !profile.id ||
+      typeof profile.name !== 'string' ||
+      !profile.name.trim() ||
+      profile.name.length > 60
+    )
+      throw new Error('Invalid saved account profile');
+    return { id: profile.id, name: profile.name, ...credentials(profile) };
+  });
+  if (new Set(profiles.map((profile) => profile.id)).size !== profiles.length)
+    throw new Error('Duplicate account profile IDs');
+  const active = profiles.find((profile) => profile.id === secrets.activeProfileId);
+  if (!active) throw new Error('Active account profile is missing');
+  return { ...credentials(active), activeProfileId: active.id, profiles };
+}
+
 export function encryptSecrets(secrets, passphrase) {
   if (typeof passphrase !== 'string' || !passphrase) {
     throw new Error('Enter an encryption password');
@@ -12,11 +45,7 @@ export function encryptSecrets(secrets, passphrase) {
   const key = crypto.scryptSync(passphrase, salt, 32, SCRYPT);
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
   const plaintext = Buffer.from(
-    JSON.stringify({
-      hoyolabCookie: String(secrets.hoyolabCookie || ''),
-      skportToken: String(secrets.skportToken || ''),
-      ...(secrets.hoyolabUid ? { hoyolabUid: String(secrets.hoyolabUid) } : {}),
-    }),
+    JSON.stringify(secrets.profiles ? accountProfiles(secrets) : credentials(secrets)),
     'utf8',
   );
   const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
@@ -59,7 +88,7 @@ export function decryptSecrets(envelope, passphrase) {
         throw new Error('Invalid secrets data');
       if (result.hoyolabUid !== undefined && typeof result.hoyolabUid !== 'string')
         throw new Error('Invalid account ID');
-      return result;
+      return result.profiles ? accountProfiles(result) : result;
     } finally {
       plaintext.fill(0);
     }

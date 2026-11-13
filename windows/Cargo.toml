@@ -1,0 +1,37 @@
+[package]
+name = "chinaslop-tracker-windows"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+aes-gcm = "0.10"
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+directories = "6"
+eframe = { version = "0.33", default-features = false, features = ["default_fonts", "glow", "x11", "wayland"] }
+egui_extras = { version = "0.33", features = ["image", "http", "file"] }
+hex = "0.4"
+hmac = "0.12"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+md-5 = "0.10"
+rand = "0.9"
+regex = "1"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+rfd = "0.15"
+rusqlite = { version = "0.37", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+uuid = { version = "1", features = ["v4", "serde"] }
+webbrowser = "1"
+fs2 = "0.4"
+tempfile = "3"
+
+[target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
+keyring = { version = "3", features = ["apple-native", "windows-native"] }
+
+
+
+[profile.release]
+lto = "thin"
+strip = true

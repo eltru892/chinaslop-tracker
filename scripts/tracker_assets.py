@@ -9,7 +9,7 @@ TRACKER = ROOT / 'tracker'
 SOURCE_FILES = (
     'index.html', 'app.js', 'style.css', 'server.mjs', 'history.mjs',
     'history-dates.mjs', 'collector.mjs', 'check-in.mjs', 'auto-check-in.mjs',
-    'events.mjs', 'official-art.mjs', 'event-images.mjs', 'secrets.mjs',
+    'events.mjs', 'official-art.mjs', 'event-images.mjs', 'secrets.mjs', 'device-unlock.mjs',
     'hoyolab-settings.mjs', 'resource-time.mjs', 'package.json', 'config.example.json',
     'data/backgrounds.js',
 )
@@ -39,7 +39,6 @@ def copy_tracker(destination):
     destination = Path(destination)
     allowed = [ROOT / path for path in (
         'desktop/tracker', 'android/app/src/main/assets/tracker',
-        'tauri/src-tauri/resources/tracker', 'tauri/src-tauri/gen/android/app/src/main/assets/tracker',
     )]
     if destination not in allowed or any(p.is_symlink() for p in [destination, *destination.parents]):
         raise ValueError(f'Not a generated tracker bundle: {destination}')

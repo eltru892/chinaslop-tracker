@@ -29,7 +29,7 @@
               <path
                 d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.5-1L20 9M4 15l2.4 3A7 7 0 0 0 18 17"
               /></svg
-            ><span id="syncLabel">Refresh now</span>
+            ><span id="syncLabel">Refresh</span>
           </button>
           <button id="checkIn" class="secondary" disabled>
             <span aria-hidden="true">✓</span><span id="checkInLabel">Check in</span>
@@ -50,6 +50,9 @@
             >Settings
           </button>
         </div>
+        <p id="refreshStatus" class="refreshStatus" role="status" aria-live="polite">
+          Ready to refresh
+        </p>
         <div class="syncstatus">
           <span id="synced">No sync yet</span
           ><span id="nextRefresh" role="timer" aria-live="off">Checking auto refresh…</span>
@@ -92,17 +95,13 @@
             <button type="submit" id="unlockButton">Encrypt and unlock</button>
           </div>
         </form>
-        <p class="small">
-          This password is not saved. You will enter it each time the tracker starts. Keep it
-          somewhere safe; an encrypted file cannot be recovered without it.
+        <p id="deviceUnlockHelp" class="small">
+          Keep your encryption password for recovery on another device.
         </p>
       </section>
       <section id="setup" class="setup" hidden>
         <h2>Connect your accounts</h2>
-        <p>
-          Add your HoYoLAB session cookie and SKPORT token in Settings to fetch progress. Tokens
-          stay in this folder on your computer.
-        </p>
+        <p>Add your HoYoLAB session cookie and SKPORT token in Settings to fetch progress.</p>
         <button id="setupSettings">Open Settings</button>
       </section>
       <section id="settings" class="settings" hidden>
@@ -137,9 +136,16 @@
           </button>
         </nav>
         <div id="settingsAccounts" class="settingsPanel">
-          <p class="settingsIntro">
-            Saved values stay hidden. Leave a field blank to keep its saved value.
-          </p>
+          <div class="settingsAccountControls">
+            <select
+              id="settingsAccountName"
+              class="settingsAccountName"
+              aria-label="Account to manage"
+            ></select>
+            <button id="createProfile" type="button" class="secondary">Add account</button>
+            <button id="deleteProfile" type="button" class="ghost">Delete saved account</button>
+            <p id="profileMessage" role="status"></p>
+          </div>
           <form id="settingsForm" class="accountSettingsForm">
             <fieldset class="accountGroup">
               <legend>HoYoLAB</legend>
@@ -206,7 +212,7 @@
                 </details>
               </div>
               <button type="button" id="removeHoyo" class="ghost removeAccount">
-                Remove HoYoLAB
+                Disconnect HoYoLAB
               </button>
             </fieldset>
             <fieldset class="accountGroup">
@@ -262,7 +268,7 @@
                 </details>
               </div>
               <button type="button" id="removeSkport" class="ghost removeAccount">
-                Remove SKPORT
+                Disconnect SKPORT
               </button>
             </fieldset>
             <fieldset class="refreshGroup">
@@ -372,6 +378,7 @@
           <p id="backgroundMessage" role="status"></p>
         </div>
         <div id="settingsSecurity" class="settingsPanel passwordSettings" hidden>
+          <p id="deviceUnlockStatus" role="status"></p>
           <h3>Change encryption password</h3>
           <p>Update the password used to unlock your saved account credentials.</p>
           <form id="passwordForm">
@@ -404,6 +411,9 @@
         </div>
       </section>
       <section id="daily">
+        <div id="accountProfileControl" class="accountProfileControl" hidden>
+          <select id="accountProfile" aria-label="Active saved account"></select>
+        </div>
         <div class="sectiontitle">
           <div class="sectionHeading">
             <div><h2>Daily progress</h2></div>

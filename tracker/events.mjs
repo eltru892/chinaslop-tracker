@@ -399,6 +399,56 @@ export function createEventService({ fetcher = fetch, clock = Date.now, ttl = 15
   const cache = new Map(),
     pending = new Map();
   const discoverArtwork = createOfficialArtwork({ fetcher, clock, ttl });
+  async function enrichArtwork(game, events) {
+    if (game !== 'endfield' && events.some((event) => !event.imageUrl)) {
+      // Public official announcement feeds: account cookies are never sent here.
+      const feeds = await Promise.allSettled(
+        [1, 2, 3].map((type) =>
+          requestJSON(
+            fetcher,
+            'https://bbs-api-os.hoyolab.com/community/post/wapi/getNewsList?' +
+              new URLSearchParams({
+                gids: String({ genshin: 2, hsr: 6, zzz: 8 }[game]),
+                type: String(type),
+                page_size: '50',
+              }),
+            { headers: { Accept: 'application/json', 'x-rpc-language': 'en-us' } },
+          ).then(checked),
+        ),
+      );
+      events = addAnnouncementImages(
+        events,
+        feeds.flatMap((feed) => (feed.status === 'fulfilled' ? feed.value.list || [] : [])),
+      );
+      const news = feeds[2];
+      if (
+        events.some((event) => !event.imageUrl) &&
+        news.status === 'fulfilled' &&
+        news.value.last_id &&
+        !news.value.is_last
+      ) {
+        try {
+          const older = checked(
+            await requestJSON(
+              fetcher,
+              'https://bbs-api-os.hoyolab.com/community/post/wapi/getNewsList?' +
+                new URLSearchParams({
+                  gids: String({ genshin: 2, hsr: 6, zzz: 8 }[game]),
+                  type: '3',
+                  page_size: '50',
+                  last_id: String(news.value.last_id),
+                }),
+              { headers: { Accept: 'application/json', 'x-rpc-language': 'en-us' } },
+            ),
+          );
+          events = addAnnouncementImages(events, older.list || []);
+        } catch {
+          /* Artwork lookup failure must not hide the event schedule. */
+        }
+      }
+    }
+    return discoverArtwork(game, events);
+  }
   async function cached(key, loader) {
     const old = cache.get(key),
       now = clock();
@@ -430,7 +480,7 @@ export function createEventService({ fetcher = fetch, clock = Date.now, ttl = 15
     pending.set(key, promise);
     return promise;
   }
-  return async function getEvents(secrets = {}, latest = null, selections = {}) {
+  return async function getEvents(secrets = {}, latest = null, selections = {}, options = {}) {
     const cookie = String(secrets.hoyolabCookie || '');
     const uid = String(
       secrets.hoyolabUid || /(?:^|;\s*)(?:ltuid_v2|ltuid)=([^;]+)/.exec(cookie)?.[1] || '',
@@ -451,7 +501,10 @@ export function createEventService({ fetcher = fetch, clock = Date.now, ttl = 15
       return rolePromise;
     }
     await Promise.all(
-      ['genshin', 'hsr', 'zzz', 'endfield'].map(async (game) => {
+      (options.game && Object.hasOwn(EVENT_SOURCES, options.game)
+        ? [options.game]
+        : Object.keys(EVENT_SOURCES)
+      ).map(async (game) => {
         const source = EVENT_SOURCES[game];
         const selected = EVENT_SERVERS[game].includes(selections[game]) ? selections[game] : '';
         const region =
@@ -473,7 +526,7 @@ export function createEventService({ fetcher = fetch, clock = Date.now, ttl = 15
           async () => {
             if (game === 'endfield') {
               const calendar = await loadOfficialEndfield(fetcher, region, clock());
-              return { ...calendar, events: await discoverArtwork(game, calendar.events) };
+              return calendar;
             }
             let card = (await roles()).find(
               (role) => Number(role.game_id) === { genshin: 2, hsr: 6, zzz: 8 }[game],
@@ -570,55 +623,8 @@ export function createEventService({ fetcher = fetch, clock = Date.now, ttl = 15
               });
             }
             let events = normalizeHoyoEvents(game, data, clock(), role.server);
-            if (events.some((event) => !event.imageUrl)) {
-              // Public official announcement feeds: account cookies are never sent here.
-              const feeds = await Promise.allSettled(
-                [1, 2, 3].map((type) =>
-                  requestJSON(
-                    fetcher,
-                    'https://bbs-api-os.hoyolab.com/community/post/wapi/getNewsList?' +
-                      new URLSearchParams({
-                        gids: String({ genshin: 2, hsr: 6, zzz: 8 }[game]),
-                        type: String(type),
-                        page_size: '50',
-                      }),
-                    { headers: { Accept: 'application/json', 'x-rpc-language': 'en-us' } },
-                  ).then(checked),
-                ),
-              );
-              events = addAnnouncementImages(
-                events,
-                feeds.flatMap((feed) => (feed.status === 'fulfilled' ? feed.value.list || [] : [])),
-              );
-              const news = feeds[2];
-              if (
-                events.some((event) => !event.imageUrl) &&
-                news.status === 'fulfilled' &&
-                news.value.last_id &&
-                !news.value.is_last
-              ) {
-                try {
-                  const older = checked(
-                    await requestJSON(
-                      fetcher,
-                      'https://bbs-api-os.hoyolab.com/community/post/wapi/getNewsList?' +
-                        new URLSearchParams({
-                          gids: String({ genshin: 2, hsr: 6, zzz: 8 }[game]),
-                          type: '3',
-                          page_size: '50',
-                          last_id: String(news.value.last_id),
-                        }),
-                      { headers: { Accept: 'application/json', 'x-rpc-language': 'en-us' } },
-                    ),
-                  );
-                  events = addAnnouncementImages(events, older.list || []);
-                } catch {
-                  /* Artwork lookup failure must not hide the event schedule. */
-                }
-              }
-            }
             return {
-              events: await discoverArtwork(game, events),
+              events,
               region: role.server,
               ...(missingSchedules.length
                 ? {
@@ -628,7 +634,19 @@ export function createEventService({ fetcher = fetch, clock = Date.now, ttl = 15
             };
           },
         );
-        games[game] = { source, ...result, events: ongoingEvents(result.events, clock()) };
+        // Calendar data is cached separately so optional artwork never delays the first view.
+        let events = result.events;
+        const artworkKey = `art:${game}:${fingerprint}:${region}:${selected}:${result.checkedAt}`;
+        const savedArtwork = cache.get(artworkKey);
+        if (savedArtwork && !savedArtwork.error) {
+          events = savedArtwork.events;
+        } else if (options.artwork !== false && !result.error) {
+          const artwork = await cached(artworkKey, async () => ({
+            events: await enrichArtwork(game, events),
+          }));
+          if (!artwork.error) events = artwork.events;
+        }
+        games[game] = { source, ...result, events: ongoingEvents(events, clock()) };
       }),
     );
     return { games, serverTime: clock() };

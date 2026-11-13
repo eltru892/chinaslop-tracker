@@ -20,11 +20,15 @@ export function createAutoCheckInScheduler({
     running = true;
     nextAt = null;
     try {
-      lastResult = await run();
+      const result = await run();
+      if (version !== generation) return;
+      lastResult = result;
       lastError = null;
     } catch {
+      if (version !== generation) return;
       lastError = 'Automatic check-in could not complete. It will retry in one hour.';
     } finally {
+      if (version !== generation) return;
       running = false;
       lastAt = now();
       if (enabled && version === generation) {
@@ -38,11 +42,19 @@ export function createAutoCheckInScheduler({
     configure(value) {
       if (enabled === value) return;
       enabled = value;
+      if (!enabled) running = false;
       generation++;
       if (timer !== null) clearTimer(timer);
       timer = null;
       nextAt = null;
       if (enabled) void tick(generation);
+    },
+    reset() {
+      enabled = false;
+      generation++;
+      if (timer !== null) clearTimer(timer);
+      timer = nextAt = lastAt = lastResult = lastError = null;
+      running = false;
     },
     state: () => ({ running, nextAt, lastAt, lastResult, lastError }),
   };

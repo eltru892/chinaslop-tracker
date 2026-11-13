@@ -1,12 +1,83 @@
-import { getElement, GAME_NAMES, GAME_ORDER, requestJson, showNotice } from './shared.js';
+import {
+  getElement,
+  createElement,
+  GAME_NAMES,
+  GAME_ORDER,
+  requestJson,
+  showNotice,
+} from './shared.js';
 // Manage account forms and storage unlock UI; app.js supplies refresh callbacks.
 export function initSettings({ reload, refresh }) {
+  const profileSelectors = ['accountProfile', 'settingsAccountName'].map(getElement);
+  let activeProfileId = null;
+  let profileItems = [];
+  let profileSignature = '';
+  let profileBusy = false;
+  function clearCredentials() {
+    for (const id of ['hoyoCookie', 'hoyoUid', 'skportToken']) getElement(id).value = '';
+  }
+  async function changeProfile(payload) {
+    if (profileBusy) return;
+    profileBusy = true;
+    getElement('profileMessage').textContent = 'Updating saved accounts…';
+    for (const select of profileSelectors) select.disabled = true;
+    try {
+      await requestJson('/api/profiles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, expectedActiveId: activeProfileId }),
+      });
+      clearCredentials();
+      await reload();
+      if (payload.action === 'create') {
+        toggleSettings(true);
+        document.querySelector('[aria-controls="settingsAccounts"]').click();
+        getElement('settings').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      getElement('profileMessage').textContent =
+        payload.action === 'create'
+          ? 'Account added. Enter its connection details below and select Save and sync.'
+          : payload.action === 'delete'
+            ? 'Profile deleted. Its history is still available.'
+            : 'Account updated.';
+    } catch (error) {
+      await reload();
+      showNotice(error.message);
+      getElement('profileMessage').textContent = error.message;
+    } finally {
+      profileBusy = false;
+      for (const select of profileSelectors) select.disabled = !activeProfileId;
+    }
+  }
+  for (const select of profileSelectors)
+    select.addEventListener('change', (event) => {
+      const id = event.target.value;
+      if (id === activeProfileId) return;
+      if (
+        ['hoyoCookie', 'hoyoUid', 'skportToken'].some((field) => getElement(field).value) &&
+        !window.confirm('Switch accounts and discard the connection details you have not saved?')
+      ) {
+        event.target.value = activeProfileId;
+        return;
+      }
+      void changeProfile({ action: 'switch', id });
+    });
+  getElement('createProfile').addEventListener('click', () => {
+    void changeProfile({ action: 'create' });
+  });
+  getElement('deleteProfile').addEventListener('click', () => {
+    const name =
+      profileItems.find((profile) => profile.id === activeProfileId)?.name || 'this profile';
+    if (window.confirm(`Delete “${name}” and its saved connections? Its history will be kept.`))
+      void changeProfile({ action: 'delete' });
+  });
   async function saveSettings(payload) {
+    if (profileBusy) return;
     try {
       await requestJson('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, profileId: activeProfileId }),
       });
       // Clear submitted credentials from the form after the server accepts them.
       getElement('hoyoCookie').value = '';
@@ -116,6 +187,52 @@ export function initSettings({ reload, refresh }) {
   // Render connection flags from the server rather than reading saved credential values.
   function renderSettings(state) {
     const locked = !!state.security?.locked;
+    const automatic = state.security?.automaticUnlock;
+    const deviceMessage =
+      automatic?.error ||
+      (automatic?.pending
+        ? 'Unlocking with secure device storage…'
+        : automatic?.remembered
+          ? `This device is remembered using ${automatic.provider}. Your accounts stay encrypted.`
+          : automatic?.supported
+            ? `Enter your password once. This device will be remembered using ${automatic.provider} for automatic unlocking.`
+            : 'Automatic unlocking is unavailable on this device. Enter your encryption password when starting the tracker.');
+    getElement('deviceUnlockHelp').textContent =
+      deviceMessage + ' Keep your password for recovery on another device.';
+    getElement('deviceUnlockStatus').textContent = deviceMessage;
+    getElement('unlockButton').disabled = !!automatic?.pending;
+    const nextId = state.profiles?.activeId || null;
+    const profileChanged = nextId !== activeProfileId;
+    if (profileChanged) clearCredentials();
+    activeProfileId = nextId;
+    profileItems = state.profiles?.items || [];
+    getElement('accountProfileControl').hidden = locked;
+    const signature = JSON.stringify(state.profiles);
+    if (signature !== profileSignature) {
+      profileSignature = signature;
+      for (const select of profileSelectors)
+        select.replaceChildren(
+          ...profileItems.map((profile) => {
+            const option = createElement('option', '', profile.name);
+            option.value = profile.id;
+            return option;
+          }),
+        );
+    }
+    for (const select of profileSelectors) {
+      select.value = nextId || '';
+      select.disabled = locked || profileBusy;
+    }
+    getElement('deleteProfile').disabled = profileItems.length < 2;
+    for (const [buttonId, provider, connected] of [
+      ['removeHoyo', 'HoYoLAB', state.configured.hoyolab],
+      ['removeSkport', 'SKPORT', state.configured.skport],
+    ]) {
+      const button = getElement(buttonId);
+      button.textContent = `Disconnect ${provider}`;
+      button.disabled = locked || !connected;
+    }
+
     getElement('connectionSummary').textContent = locked ? 'Storage locked' : 'Local tracker';
     getElement('connectionSummary').classList.toggle('is-locked', locked);
     getElement('security').hidden = !locked;

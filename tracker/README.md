@@ -8,7 +8,7 @@ This export contains the app source, tests, game icons, and 32 Endfield backgrou
 
 ## Start
 
-Install Node.js 24 or newer if needed, then extract this ZIP. On macOS, double-click `launch.command`; on Windows, double-click `launch.bat`. Or run `node server.mjs` in this folder. Close any other running copy using port 4317 first. Open the local address printed in the terminal (default: `http://127.0.0.1:4317`). Keep the terminal running for automatic refreshes. The app uses Node.js built-in modules and needs no package install.
+Install Node.js 24 or newer if needed, then extract this ZIP. From the project root, double-click `Start Tracker.command` on macOS or `launch.bat` on Windows. Or run `node server.mjs` in this folder. Close any other running copy using port 4317 first. Open the local address printed in the terminal (default: `http://127.0.0.1:4317`). Keep the terminal running for automatic refreshes. The app uses Node.js built-in modules and needs no package install.
 
 When the dashboard opens, set an encryption password. Enter it again each time you restart the tracker. In Settings, expand the two **How to get** guides, then paste your own HoYoLAB session cookie and SKPORT account token. The app encrypts both values in `secrets.enc.json` using scrypt and AES-256-GCM. The encryption password is kept only in memory while the tracker runs. `config.local.json` holds only non-secret settings after migration. Both files have user-only permissions. The app binds to `127.0.0.1`; it does not send credentials to any service other than HoYoLAB and SKPORT.
 
@@ -69,6 +69,6 @@ History is a separate page with independent daily and weekly pagination. Desktop
 
 ## Verification
 
-Automated development tests live in the repository’s top-level `tests/` folder, separate from this app folder. From the full repository root, run `node --test tests/*.test.mjs` (or `npm test`). Tests are not included in packaged apps; no test files are needed to run the tracker.
+Automated development tests live in the repository’s top-level `tests/` folder, separate from this app folder. From the full repository root, run `npm test`. Tests are not included in packaged apps; no test files are needed to run the tracker.
 
 History retains observations from the last 365 days regardless of refresh interval. Expired records are removed from disk on startup and sync. Damaged history lines are skipped while valid records are recovered. Failed game refreshes retain the last successful progress, labeled with its original observation time and the refresh error.

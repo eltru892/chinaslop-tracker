@@ -2,9 +2,11 @@ import { getElement, createElement, GAME_NAMES, GAME_ORDER, requestJson } from '
 // Show manual check-in results; the local server performs the provider requests.
 export function initCheckIn({ isLocked }) {
   let checkInBusy = false;
+  let activeProfileId = null;
   getElement('checkIn').addEventListener('click', async () => {
     // Ignore repeat clicks until the current check-in request finishes.
     if (checkInBusy) return;
+    const profileId = activeProfileId;
     checkInBusy = true;
     getElement('checkIn').disabled = true;
     getElement('checkInLabel').textContent = 'Checking in…';
@@ -61,7 +63,11 @@ export function initCheckIn({ isLocked }) {
     document.body.append(dialog);
     dialog.showModal();
     try {
-      const data = await requestJson('/api/check-in', { method: 'POST' });
+      const data = await requestJson('/api/check-in', {
+        method: 'POST',
+        headers: { 'X-Tracker-Profile': profileId || '' },
+      });
+      if (profileId !== activeProfileId) return;
       paint(data.games);
     } catch (error) {
       results.replaceChildren(createElement('p', '', error.message));
@@ -80,5 +86,11 @@ export function initCheckIn({ isLocked }) {
       : 'Claim daily HoYoLAB and SKPORT check-in rewards';
   }
 
-  return { setLocked };
+  function setProfile(id) {
+    if (id !== activeProfileId) {
+      activeProfileId = id;
+      for (const dialog of document.querySelectorAll('.checkInDialog')) dialog.close();
+    }
+  }
+  return { setLocked, setProfile };
 }

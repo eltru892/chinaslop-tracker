@@ -237,7 +237,7 @@ export function hoyoHeaders(cookie, signed = false) {
 function cookieUid(cookie) {
   return /(?:^|;\s*)(?:ltuid_v2|ltuid)=([^;]+)/.exec(cookie)?.[1] || '';
 }
-export async function fetchHoyo(config) {
+export async function fetchHoyo(config, request = jsonRequest) {
   const cookie = String(config.hoyolabCookie || '').trim();
   if (!cookie)
     return {
@@ -248,32 +248,34 @@ export async function fetchHoyo(config) {
   const uid = String(config.hoyolabUid || cookieUid(cookie));
   if (!uid) throw new Error('HoYoLAB UID missing; enter it in Settings');
   const cardUrl = `${HOYO_BASE}/game_record/card/wapi/getGameRecordCard?uid=${encodeURIComponent(uid)}`;
-  const cards =
-    checkedHoyo(await jsonRequest(cardUrl, { headers: hoyoHeaders(cookie) })).list || [];
+  const cards = checkedHoyo(await request(cardUrl, { headers: hoyoHeaders(cookie) })).list || [];
   const definitions = [
     ['genshin', 2, `${HOYO_BASE}/event/game_record/genshin/api/dailyNote`, false],
     ['hsr', 6, 'https://bbs-api-os.hoyolab.com/game_record/hkrpg/api/note', true],
     ['zzz', 8, `${HOYO_BASE}/event/game_record_zzz/api/zzz/note`, false],
   ];
   const out = {};
-  for (const [game, id, endpoint, signed] of definitions) {
-    const card = cards.find((c) => Number(c.game_id) === id);
-    if (!card?.game_role_id || !card?.region) {
-      out[game] = { error: 'No linked game role found in HoYoLAB' };
-      continue;
-    }
-    try {
-      const url = `${endpoint}?server=${encodeURIComponent(card.region)}&role_id=${encodeURIComponent(card.game_role_id)}`;
-      const data = checkedHoyo(await jsonRequest(url, { headers: hoyoHeaders(cookie, signed) }));
-      out[game] = normalize(game, data, {
-        nickname: card.nickname || '',
-        uid: card.game_role_id,
-        region: card.region,
-      });
-    } catch (error) {
-      out[game] = { error: error.message };
-    }
-  }
+  // Roles share one lookup; their independent progress requests run together.
+  await Promise.all(
+    definitions.map(async ([game, id, endpoint, signed]) => {
+      const card = cards.find((c) => Number(c.game_id) === id);
+      if (!card?.game_role_id || !card?.region) {
+        out[game] = { error: 'No linked game role found in HoYoLAB' };
+        return;
+      }
+      try {
+        const url = `${endpoint}?server=${encodeURIComponent(card.region)}&role_id=${encodeURIComponent(card.game_role_id)}`;
+        const data = checkedHoyo(await request(url, { headers: hoyoHeaders(cookie, signed) }));
+        out[game] = normalize(game, data, {
+          nickname: card.nickname || '',
+          uid: card.game_role_id,
+          region: card.region,
+        });
+      } catch (error) {
+        out[game] = { error: error.message };
+      }
+    }),
+  );
   return out;
 }
 
@@ -314,6 +316,7 @@ export async function getSkportContext(config, request = jsonRequest) {
       /* Use the pasted token as-is. */
     }
   }
+
   const grant = checkedSkport(
     await request('https://as.gryphline.com/user/oauth2/v2/grant', {
       method: 'POST',
@@ -341,12 +344,12 @@ export async function getSkportContext(config, request = jsonRequest) {
   const roleKey = `3_${role.roleId}_${role.serverId}`;
   return { cred: auth.cred, salt: auth.token, role, roleKey };
 }
-export async function fetchEndfield(config) {
+export async function fetchEndfield(config, request = jsonRequest) {
   if (!config.skportToken) return { error: 'Connect SKPORT in Settings' };
-  const { cred, salt, role, roleKey } = await getSkportContext(config);
+  const { cred, salt, role, roleKey } = await getSkportContext(config, request);
   const detailPath = '/api/v1/game/endfield/card/detail';
   const detailData = checkedSkport(
-    await jsonRequest(`${SKPORT_BASE}${detailPath}`, {
+    await request(`${SKPORT_BASE}${detailPath}`, {
       headers: skportHeaders(cred, salt, detailPath, roleKey),
     }),
   );
@@ -357,17 +360,53 @@ export async function fetchEndfield(config) {
   });
 }
 
-export async function collect(config) {
+export async function collect(config, { onTiming, onProgress } = {}) {
+  const started = performance.now();
+  // Diagnostics contain only fixed labels and durations, never URLs or credentials.
+  const labels = {
+    '/game_record/card/wapi/getGameRecordCard': 'HoYoLAB linked accounts',
+    '/event/game_record/genshin/api/dailyNote': 'Genshin progress',
+    '/game_record/hkrpg/api/note': 'HSR progress',
+    '/event/game_record_zzz/api/zzz/note': 'ZZZ progress',
+    '/user/oauth2/v2/grant': 'SKPORT authorization',
+    '/web/v1/user/auth/generate_cred_by_code': 'SKPORT credentials',
+    '/api/v1/game/player/binding': 'SKPORT linked accounts',
+    '/api/v1/game/endfield/card/detail': 'Endfield progress',
+  };
+  const request =
+    onTiming || onProgress
+      ? async (url, options) => {
+          const start = performance.now();
+          let ok = false;
+          const label = labels[new URL(url).pathname] || 'Provider request';
+          onProgress?.({ request: label, running: true });
+          try {
+            const body = await jsonRequest(url, options);
+            ok = (body.retcode ?? body.code ?? body.status) === 0;
+            return body;
+          } finally {
+            onProgress?.({ request: label, running: false });
+            onTiming?.({
+              request: label,
+              startedMs: Math.round(start - started),
+              durationMs: Math.round(performance.now() - start),
+              ok,
+            });
+          }
+        }
+      : jsonRequest;
   const result = { at: new Date().toISOString(), games: {} };
-  try {
-    Object.assign(result.games, await fetchHoyo(config));
-  } catch (error) {
-    for (const game of ['genshin', 'hsr', 'zzz']) result.games[game] = { error: error.message };
+  // Start both providers immediately; a provider failure must not discard the other result.
+  const [hoyo, endfield] = await Promise.allSettled([
+    fetchHoyo(config, request),
+    fetchEndfield(config, request),
+  ]);
+  if (hoyo.status === 'fulfilled') Object.assign(result.games, hoyo.value);
+  else {
+    for (const game of ['genshin', 'hsr', 'zzz'])
+      result.games[game] = { error: hoyo.reason.message };
   }
-  try {
-    result.games.endfield = await fetchEndfield(config);
-  } catch (error) {
-    result.games.endfield = { error: error.message };
-  }
+  result.games.endfield =
+    endfield.status === 'fulfilled' ? endfield.value : { error: endfield.reason.message };
   return result;
 }

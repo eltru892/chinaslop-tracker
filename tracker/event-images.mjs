@@ -15,7 +15,7 @@ export function createEventImageLoader({
   const cache = new Map(),
     pending = new Map();
   let storedBytes = 0;
-  return async function load(value) {
+  return async function load(value, { thumbnail = false } = {}) {
     let url;
     try {
       url = new URL(value);
@@ -30,6 +30,10 @@ export function createEventImageLoader({
       (url.port && url.port !== '443')
     )
       throw new Error('Unsupported artwork host.');
+    // HoYoLAB's official CDN supports resizing; other hosts retain their original artwork.
+    if (thumbnail && url.hostname === 'upload-os-bbs.hoyolab.com') {
+      url.searchParams.set('x-oss-process', 'image/resize,w_640/quality,q_75/format,webp');
+    }
     const key = url.href,
       old = cache.get(key);
     if (old && clock() - old.at < 3600000) {
