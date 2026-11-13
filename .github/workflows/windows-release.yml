@@ -1,0 +1,86 @@
+name: Native Windows release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: windows
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+          rustup default stable
+      - name: Check formatting and tests
+        run: |
+          cargo fmt --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --locked --tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo clippy --locked --all-targets -- -D warnings
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build native executable
+        run: |
+          cargo build --locked --release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Package portable app
+        run: |
+          $version = (Get-Content Cargo.toml | Select-String '^version = "([^"]+)"').Matches[0].Groups[1].Value
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") { throw 'Tag and package version differ.' }
+          $name = "Chinaslop-Tracker-Windows-$version-x64"
+          $folder = "artifacts/$name"
+          New-Item -ItemType Directory -Path $folder -Force | Out-Null
+          Copy-Item target/release/chinaslop-tracker-windows.exe "$folder/Chinaslop Tracker.exe"
+          Copy-Item assets "$folder/assets" -Recurse
+          Copy-Item ATTRIBUTION.md "$folder/ATTRIBUTION.md"
+          Copy-Item PORTABLE.txt "$folder/README.txt"
+          if (!(Test-Path "$folder/assets/backgrounds.json")) { throw 'Artwork catalog missing.' }
+          if (Get-ChildItem $folder -Recurse -File | Where-Object { $_.Name -match 'secrets|\.sqlite|\.keystore|\.jks|config\.local' }) { throw 'Unexpected private files in package.' }
+          Compress-Archive -Path $folder -DestinationPath "artifacts/$name.zip"
+          $hash = (Get-FileHash "artifacts/$name.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $name.zip" | Set-Content artifacts/SHA256SUMS.txt -Encoding utf8
+      - name: Smoke-test packaged app with sample data
+        run: |
+          $folder = (Get-ChildItem artifacts -Directory | Select-Object -First 1).FullName
+          $process = Start-Process -FilePath "$folder/Chinaslop Tracker.exe" -ArgumentList '--demo' -WorkingDirectory $env:TEMP -PassThru
+          try {
+            $ready = $false
+            for ($i = 0; $i -lt 30; $i++) {
+              Start-Sleep -Seconds 1
+              $process.Refresh()
+              if ($process.HasExited) { throw "App exited during startup: $($process.ExitCode)" }
+              if ($process.MainWindowHandle -ne 0) { $ready = $true; break }
+            }
+            if (!$ready) { throw 'Native app window did not open.' }
+            Start-Sleep -Seconds 3
+            $process.Refresh()
+            if ($process.HasExited) { throw 'App exited after opening.' }
+            Write-Output "Native window opened: $($process.MainWindowTitle)"
+          } finally {
+            if (!$process.HasExited) { Stop-Process -Id $process.Id }
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-windows
+          path: |
+            windows/artifacts/*.zip
+            windows/artifacts/SHA256SUMS.txt
+          if-no-files-found: error
+      - name: Create draft release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $assets = @((Get-ChildItem artifacts/*.zip).FullName) + @((Resolve-Path artifacts/SHA256SUMS.txt).Path)
+          gh release create $env:GITHUB_REF_NAME --verify-tag --draft --title "Chinaslop Tracker $env:GITHUB_REF_NAME — Native Windows" --notes-file RELEASE_NOTES.md @assets
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

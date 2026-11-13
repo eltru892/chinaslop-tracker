@@ -1,0 +1,15 @@
+Chinaslop Tracker - Native Windows
+
+1. Extract the entire ZIP into a folder.
+2. Open Chinaslop Tracker.exe. Keep the assets folder beside it.
+3. Add your HoYoLAB and/or SKPORT connections in Settings.
+
+This app runs independently; Node.js and a browser are not required.
+The native app has separate account storage and history from older tracker apps.
+Windows Credential Manager remembers its encryption key.
+
+This executable is unsigned. Windows may show an unknown publisher warning.
+Automatic refresh and check-in require the app to remain running.
+
+For a credential-free preview, launch the executable with --demo.
+Source and documentation: https://github.com/eltru892/chinaslop-tracker
