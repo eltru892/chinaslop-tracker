@@ -85,7 +85,7 @@ On Windows:
 3. Open `windows/Build Windows.cmd`.
 4. Find the executable and assets in `windows/artifacts/windows/`.
 
-Keep the `assets` folder beside the executable. The output is a portable, unsigned app, not an installer. Compilation and automated checks have been run on macOS; Windows runtime testing is still required.
+Keep the `assets` folder beside the executable. The output is a portable, unsigned app, not an installer.
 
 For a source-code preview, run from `windows/`:
 
