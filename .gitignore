@@ -14,8 +14,6 @@
 # Generated applications, runtime downloads, and build tools
 .cache/
 **/node_modules/
-desktop/tracker/
-desktop/dist/
 android/app/src/main/assets/tracker/
 android/app/src/main/jniLibs/
 android/.gradle/

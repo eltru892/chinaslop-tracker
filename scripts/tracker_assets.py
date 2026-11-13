@@ -38,7 +38,7 @@ def copy_tracker(destination):
     """Replace only one of the known generated tracker bundles, never runtime storage."""
     destination = Path(destination)
     allowed = [ROOT / path for path in (
-        'desktop/tracker', 'android/app/src/main/assets/tracker',
+        'android/app/src/main/assets/tracker',
     )]
     if destination not in allowed or any(p.is_symlink() for p in [destination, *destination.parents]):
         raise ValueError(f'Not a generated tracker bundle: {destination}')

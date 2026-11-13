@@ -10,10 +10,9 @@ Connect your own HoYoLAB and SKPORT accounts to refresh progress automatically. 
 | ------------------ | ---------------------- | ------------------------------------------------------------------------ |
 | Browser tracker    | [`tracker/`](tracker/) | Local Node.js server with a browser interface                            |
 | Native Windows app | [`windows/`](windows/) | Rust + egui implementation; Windows build and runtime validation pending |
-| Older desktop app  | [`desktop/`](desktop/) | Legacy Electron wrapper                                                  |
 | Older Android app  | [`android/`](android/) | Legacy Android wrapper with an embedded Node.js runtime                  |
 
-The Rust app has its own interface and storage. It does not automatically import the browser tracker's accounts or history. The planned Kotlin Android app is not implemented yet.
+The Rust app has its own interface and storage. It does not automatically import the browser tracker's accounts or history. The planned Kotlin Android app is not implemented yet. The old Electron desktop source has been removed; `windows/` is the maintained native desktop implementation.
 
 [Published releases](https://github.com/eltru892/chinaslop-tracker/releases) contain earlier builds. They are not automatically updated when source code changes.
 
@@ -126,7 +125,7 @@ The browser interface uses JavaScript, HTML, and CSS. The server uses Node.js bu
 | `tests/services/`    | Provider, check-in, and artwork tests                                |
 | `tests/integration/` | Local server and account-switching tests                             |
 | `tests/ui/`          | Browser interface behavior tests                                     |
-| `scripts/`           | Asset preparation for the legacy wrappers                            |
+| `scripts/`           | Asset preparation for the legacy Android app                         |
 
 ### Test the browser tracker
 

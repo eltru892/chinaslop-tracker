@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare app assets; optionally download the pinned Android Node runtime."""
+"""Prepare Android app assets; optionally download the pinned Node runtime."""
 from pathlib import Path
 import argparse
 import hashlib
@@ -13,8 +13,7 @@ parser.add_argument('--android', action='store_true')
 parser.add_argument('--runtime-archive', type=Path)
 args = parser.parse_args()
 
-for destination in [root / 'desktop/tracker', root / 'android/app/src/main/assets/tracker']:
-    copy_tracker(destination)
+copy_tracker(root / 'android/app/src/main/assets/tracker')
 print('Prepared clean app assets. Personal settings and account data were excluded.')
 
 if args.android:
