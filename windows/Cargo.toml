@@ -8,7 +8,6 @@ aes-gcm = "0.10"
 base64 = "0.22"
 chrono = { version = "0.4", features = ["serde"] }
 directories = "6"
-eframe = { version = "0.33", default-features = false, features = ["default_fonts", "glow", "x11", "wayland"] }
 egui_extras = { version = "0.33", features = ["image", "http", "file"] }
 hex = "0.4"
 hmac = "0.12"
@@ -31,6 +30,13 @@ tempfile = "3"
 keyring = { version = "3", features = ["apple-native", "windows-native"] }
 
 
+
+[target.'cfg(target_os = "windows")'.dependencies]
+eframe = { version = "0.33", default-features = false, features = ["default_fonts", "wgpu"] }
+wgpu = { version = "27.0.1", default-features = false, features = ["std", "dx12", "wgsl"] }
+
+[target.'cfg(not(target_os = "windows"))'.dependencies]
+eframe = { version = "0.33", default-features = false, features = ["default_fonts", "glow", "x11", "wayland"] }
 
 [profile.release]
 lto = "thin"

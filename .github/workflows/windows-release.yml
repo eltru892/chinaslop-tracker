@@ -23,6 +23,7 @@ jobs:
         with:
           path: windows/target
           key: windows-release-${{ hashFiles('windows/Cargo.lock') }}
+          restore-keys: windows-release-
       - name: Set up Rust
         run: |
           rustup toolchain install stable --profile minimal --component rustfmt --component clippy
